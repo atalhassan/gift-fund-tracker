@@ -1,0 +1,609 @@
+import { useState, useEffect, useRef } from "react";
+import { Plus, Trash2, Check, Pencil, X, LogOut } from "lucide-react";
+import { supabase } from "./supabase.js";
+
+// ── Palette: a warm ledger book. Green ink for what remains, clay for what's gone,
+//    a single gold thread marking the origin of the money.
+const C = {
+  paper: "#F6F3EC",
+  card: "#FFFFFF",
+  ink: "#1C2A23",
+  emerald: "#0E6B4C",
+  emeraldSoft: "#E4EFE9",
+  gold: "#B08A3E",
+  muted: "#71807A",
+  spent: "#A8452F",
+  line: "#E7E2D6",
+};
+
+const MONO = "'SF Mono', 'SFMono-Regular', 'Menlo', 'Consolas', monospace";
+const SANS = "system-ui, -apple-system, 'Segoe UI', sans-serif";
+
+const STR = {
+  en: {
+    dir: "ltr",
+    origin: "Gift from my mother",
+    remaining: "Remaining",
+    spent: "spent",
+    of: "of",
+    desc: "On what? (e.g. portal service)",
+    add: "Record",
+    empty: "No transactions yet. Add your first above.",
+    count: (n) => `${n} transaction${n === 1 ? "" : "s"}`,
+    signin: "Sign in",
+    signup: "Create account",
+    email: "Email",
+    password: "Password",
+    toSignup: "Need an account? Create one",
+    toSignin: "Have an account? Sign in",
+    signout: "Sign out",
+  },
+  ar: {
+    dir: "rtl",
+    origin: "هدية من والدتي",
+    remaining: "المتبقّي",
+    spent: "المصروف",
+    of: "من",
+    desc: "على ماذا؟ (مثال: خدمة البوابة)",
+    add: "تسجيل",
+    empty: "لا توجد معاملات بعد. سجّل أول معاملة في الأعلى.",
+    count: (n) => `${n} معاملة`,
+    signin: "تسجيل الدخول",
+    signup: "إنشاء حساب",
+    email: "البريد الإلكتروني",
+    password: "كلمة المرور",
+    toSignup: "لا تملك حساباً؟ أنشئ واحداً",
+    toSignin: "لديك حساب؟ سجّل الدخول",
+    signout: "تسجيل الخروج",
+  },
+};
+
+const fmt = (n) =>
+  new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n);
+
+export default function App() {
+  const [session, setSession] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [lang, setLang] = useState("en");
+  const t = STR[lang];
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) =>
+      setSession(s)
+    );
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  if (!authReady) return <Screen center>…</Screen>;
+
+  return session ? (
+    <Tracker session={session} lang={lang} setLang={setLang} t={t} />
+  ) : (
+    <Auth lang={lang} setLang={setLang} t={t} />
+  );
+}
+
+function Screen({ children, center }) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: C.paper,
+        fontFamily: SANS,
+        color: C.muted,
+        display: center ? "flex" : "block",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function LangToggle({ lang, setLang }) {
+  return (
+    <button
+      onClick={() => setLang(lang === "en" ? "ar" : "en")}
+      style={{
+        border: `1px solid ${C.line}`,
+        background: C.card,
+        borderRadius: 20,
+        padding: "4px 12px",
+        fontSize: 12,
+        color: C.ink,
+        cursor: "pointer",
+        fontFamily: SANS,
+      }}
+    >
+      {lang === "en" ? "عربي" : "EN"}
+    </button>
+  );
+}
+
+function Auth({ lang, setLang, t }) {
+  const [mode, setMode] = useState("signin");
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submit = async () => {
+    setErr("");
+    setBusy(true);
+    const fn = mode === "signin" ? "signInWithPassword" : "signUp";
+    const { error } = await supabase.auth[fn]({ email, password: pw });
+    if (error) setErr(error.message);
+    setBusy(false);
+  };
+
+  return (
+    <div
+      dir={t.dir}
+      style={{
+        minHeight: "100vh",
+        background: C.paper,
+        fontFamily: SANS,
+        color: C.ink,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+      }}
+    >
+      <div style={{ position: "absolute", top: 20, insetInlineEnd: 22 }}>
+        <LangToggle lang={lang} setLang={setLang} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 22 }}>
+        <span style={{ width: 22, height: 2, background: C.gold, display: "inline-block" }} />
+        <span style={{ fontSize: 14, color: C.muted }}>{t.origin}</span>
+      </div>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          background: C.card,
+          border: `1px solid ${C.line}`,
+          borderRadius: 16,
+          padding: 20,
+        }}
+      >
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder={t.email}
+          type="email"
+          autoCapitalize="none"
+          style={inputStyle}
+        />
+        <input
+          value={pw}
+          onChange={(e) => setPw(e.target.value)}
+          placeholder={t.password}
+          type="password"
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          style={{ ...inputStyle, marginTop: 10 }}
+        />
+        {err && (
+          <div style={{ color: C.spent, fontSize: 13, marginTop: 10 }}>{err}</div>
+        )}
+        <button
+          onClick={submit}
+          disabled={busy}
+          style={{
+            width: "100%",
+            marginTop: 14,
+            border: "none",
+            background: C.emerald,
+            color: "#fff",
+            borderRadius: 12,
+            padding: "12px 16px",
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: busy ? "default" : "pointer",
+            fontFamily: SANS,
+            opacity: busy ? 0.6 : 1,
+          }}
+        >
+          {mode === "signin" ? t.signin : t.signup}
+        </button>
+        <button
+          onClick={() => {
+            setErr("");
+            setMode(mode === "signin" ? "signup" : "signin");
+          }}
+          style={{
+            width: "100%",
+            marginTop: 12,
+            border: "none",
+            background: "transparent",
+            color: C.muted,
+            fontSize: 13,
+            cursor: "pointer",
+            fontFamily: SANS,
+          }}
+        >
+          {mode === "signin" ? t.toSignup : t.toSignin}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const inputStyle = {
+  width: "100%",
+  border: `1px solid ${C.line}`,
+  borderRadius: 10,
+  padding: "11px 12px",
+  fontSize: 15,
+  fontFamily: SANS,
+  color: C.ink,
+  outline: "none",
+  background: C.paper,
+};
+
+function Tracker({ session, lang, setLang, t }) {
+  const [txs, setTxs] = useState([]);
+  const [starting, setStarting] = useState(50000);
+  const [loading, setLoading] = useState(true);
+  const [amount, setAmount] = useState("");
+  const [desc, setDesc] = useState("");
+  const [confirmId, setConfirmId] = useState(null);
+  const [editStart, setEditStart] = useState(false);
+  const [startDraft, setStartDraft] = useState("");
+  const amountRef = useRef(null);
+  const userId = session.user.id;
+
+  useEffect(() => {
+    (async () => {
+      const { data: rows } = await supabase
+        .from("transactions")
+        .select("*")
+        .order("created_at", { ascending: false });
+      setTxs(rows || []);
+
+      let { data: s } = await supabase
+        .from("fund_settings")
+        .select("starting_balance")
+        .maybeSingle();
+      if (!s) {
+        const { data: ins } = await supabase
+          .from("fund_settings")
+          .insert({ starting_balance: 50000 })
+          .select("starting_balance")
+          .single();
+        s = ins;
+      }
+      if (s) setStarting(Number(s.starting_balance));
+      setLoading(false);
+    })();
+  }, []);
+
+  const addTx = async () => {
+    const val = parseFloat(amount);
+    if (!val || val <= 0) {
+      amountRef.current?.focus();
+      return;
+    }
+    const description = desc.trim() || (lang === "ar" ? "بدون وصف" : "No description");
+    setAmount("");
+    setDesc("");
+    amountRef.current?.focus();
+    const { data, error } = await supabase
+      .from("transactions")
+      .insert({ amount: val, description })
+      .select()
+      .single();
+    if (!error && data) setTxs((prev) => [data, ...prev]);
+  };
+
+  const removeTx = async (id) => {
+    setConfirmId(null);
+    setTxs((prev) => prev.filter((x) => x.id !== id));
+    await supabase.from("transactions").delete().eq("id", id);
+  };
+
+  const saveStart = async () => {
+    const v = parseFloat(startDraft);
+    setEditStart(false);
+    if (v && v > 0) {
+      setStarting(v);
+      await supabase
+        .from("fund_settings")
+        .upsert({ user_id: userId, starting_balance: v }, { onConflict: "user_id" });
+    }
+  };
+
+  if (loading) return <Screen center>…</Screen>;
+
+  const totalSpent = txs.reduce((s, x) => s + Number(x.amount), 0);
+  const remaining = starting - totalSpent;
+  const pctSpent = Math.min(100, Math.max(0, (totalSpent / starting) * 100));
+  const over = remaining < 0;
+
+  const dateFmt = (iso) =>
+    new Date(iso).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-GB", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+  return (
+    <div
+      dir={t.dir}
+      style={{
+        minHeight: "100vh",
+        background: C.paper,
+        fontFamily: SANS,
+        color: C.ink,
+        display: "flex",
+        justifyContent: "center",
+        padding: "0 0 40px",
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 480 }}>
+        {/* Header */}
+        <div
+          style={{
+            padding: "20px 22px 0",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 22, height: 2, background: C.gold, display: "inline-block" }} />
+            <span style={{ fontSize: 13, letterSpacing: 0.3, color: C.muted }}>
+              {t.origin}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <LangToggle lang={lang} setLang={setLang} />
+            <LogOut
+              size={18}
+              color={C.muted}
+              style={{ cursor: "pointer" }}
+              onClick={() => supabase.auth.signOut()}
+            />
+          </div>
+        </div>
+
+        {/* Balance */}
+        <div style={{ padding: "18px 22px 22px" }}>
+          <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}>{t.remaining}</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span
+              style={{
+                fontFamily: MONO,
+                fontSize: 44,
+                fontWeight: 600,
+                lineHeight: 1,
+                color: over ? C.spent : C.emerald,
+                letterSpacing: -1,
+              }}
+            >
+              {fmt(remaining)}
+            </span>
+            <span style={{ fontFamily: MONO, fontSize: 15, color: C.muted }}>SAR</span>
+          </div>
+
+          <div
+            style={{
+              marginTop: 16,
+              height: 6,
+              background: C.emeraldSoft,
+              borderRadius: 4,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${pctSpent}%`,
+                height: "100%",
+                background: over ? C.spent : C.gold,
+                transition: "width .3s ease",
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              marginTop: 8,
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 12.5,
+              color: C.muted,
+              fontFamily: MONO,
+            }}
+          >
+            <span>
+              {fmt(totalSpent)} {t.spent}
+            </span>
+            {editStart ? (
+              <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                <input
+                  value={startDraft}
+                  onChange={(e) => setStartDraft(e.target.value)}
+                  inputMode="decimal"
+                  autoFocus
+                  style={{
+                    width: 80,
+                    fontFamily: MONO,
+                    fontSize: 12.5,
+                    textAlign: "end",
+                    border: `1px solid ${C.line}`,
+                    borderRadius: 6,
+                    padding: "2px 6px",
+                  }}
+                />
+                <Check size={15} color={C.emerald} style={{ cursor: "pointer" }} onClick={saveStart} />
+                <X size={15} color={C.muted} style={{ cursor: "pointer" }} onClick={() => setEditStart(false)} />
+              </span>
+            ) : (
+              <span
+                style={{ display: "inline-flex", gap: 5, alignItems: "center", cursor: "pointer" }}
+                onClick={() => {
+                  setStartDraft(String(starting));
+                  setEditStart(true);
+                }}
+              >
+                {t.of} {fmt(starting)}
+                <Pencil size={12} color={C.muted} />
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Entry card */}
+        <div
+          style={{
+            margin: "0 16px",
+            background: C.card,
+            borderRadius: 16,
+            border: `1px solid ${C.line}`,
+            padding: 14,
+            boxShadow: "0 1px 2px rgba(28,42,35,.04)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              borderBottom: `1px solid ${C.line}`,
+              paddingBottom: 12,
+              marginBottom: 12,
+            }}
+          >
+            <input
+              ref={amountRef}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              inputMode="decimal"
+              placeholder="0"
+              onKeyDown={(e) => e.key === "Enter" && addTx()}
+              style={{
+                flex: 1,
+                border: "none",
+                outline: "none",
+                fontFamily: MONO,
+                fontSize: 30,
+                fontWeight: 600,
+                color: C.ink,
+                background: "transparent",
+                minWidth: 0,
+                textAlign: t.dir === "rtl" ? "right" : "left",
+              }}
+            />
+            <span style={{ fontFamily: MONO, fontSize: 14, color: C.muted }}>SAR</span>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <input
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder={t.desc}
+              onKeyDown={(e) => e.key === "Enter" && addTx()}
+              style={{
+                flex: 1,
+                border: "none",
+                outline: "none",
+                fontFamily: SANS,
+                fontSize: 15,
+                color: C.ink,
+                background: "transparent",
+                minWidth: 0,
+              }}
+            />
+            <button
+              onClick={addTx}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                border: "none",
+                background: C.emerald,
+                color: "#fff",
+                borderRadius: 12,
+                padding: "10px 16px",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: SANS,
+                flexShrink: 0,
+              }}
+            >
+              <Plus size={16} /> {t.add}
+            </button>
+          </div>
+        </div>
+
+        {/* Ledger list */}
+        <div style={{ padding: "20px 22px 0" }}>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 6, fontFamily: MONO }}>
+            {t.count(txs.length)}
+          </div>
+
+          {txs.length === 0 ? (
+            <div style={{ color: C.muted, fontSize: 14, padding: "24px 0", textAlign: "center" }}>
+              {t.empty}
+            </div>
+          ) : (
+            txs.map((x) => (
+              <div
+                key={x.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "13px 0",
+                  borderBottom: `1px solid ${C.line}`,
+                }}
+              >
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      color: C.ink,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {x.description}
+                  </div>
+                  <div style={{ fontSize: 12, color: C.muted, fontFamily: MONO, marginTop: 2 }}>
+                    {dateFmt(x.created_at)}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginInlineStart: 12 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 15, color: C.spent, fontWeight: 600 }}>
+                    −{fmt(Number(x.amount))}
+                  </span>
+                  {confirmId === x.id ? (
+                    <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+                      <Check size={17} color={C.spent} style={{ cursor: "pointer" }} onClick={() => removeTx(x.id)} />
+                      <X size={17} color={C.muted} style={{ cursor: "pointer" }} onClick={() => setConfirmId(null)} />
+                    </span>
+                  ) : (
+                    <Trash2
+                      size={16}
+                      color={C.muted}
+                      style={{ cursor: "pointer", opacity: 0.6 }}
+                      onClick={() => setConfirmId(x.id)}
+                    />
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
