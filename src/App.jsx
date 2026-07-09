@@ -37,6 +37,9 @@ const STR = {
     toSignup: "Need an account? Create one",
     toSignin: "Have an account? Sign in",
     signout: "Sign out",
+    setupTitle: "Set up your fund",
+    setupDesc: "Enter the amount you're starting with. You can change it anytime with the pencil.",
+    setupCta: "Start tracking",
   },
   ar: {
     dir: "rtl",
@@ -55,6 +58,9 @@ const STR = {
     toSignup: "لا تملك حساباً؟ أنشئ واحداً",
     toSignin: "لديك حساب؟ سجّل الدخول",
     signout: "تسجيل الخروج",
+    setupTitle: "إعداد رصيدك",
+    setupDesc: "أدخل المبلغ الذي تبدأ به. يمكنك تغييره لاحقاً بالقلم.",
+    setupCta: "ابدأ التتبّع",
   },
 };
 
@@ -247,16 +253,127 @@ const inputStyle = {
   background: C.paper,
 };
 
+function Setup({ lang, setLang, t, onDone }) {
+  const [val, setVal] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    const v = parseFloat(val);
+    if (!v || v <= 0) return;
+    setBusy(true);
+    // user_id defaults to auth.uid() in Postgres, same as the transactions insert.
+    const { error } = await supabase
+      .from("fund_settings")
+      .insert({ starting_balance: v });
+    setBusy(false);
+    if (!error) onDone(v);
+  };
+
+  return (
+    <div
+      dir={t.dir}
+      style={{
+        minHeight: "100vh",
+        background: C.paper,
+        fontFamily: SANS,
+        color: C.ink,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+      }}
+    >
+      <div style={{ position: "absolute", top: 20, insetInlineEnd: 22 }}>
+        <LangToggle lang={lang} setLang={setLang} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 22 }}>
+        <span style={{ width: 22, height: 2, background: C.gold, display: "inline-block" }} />
+        <span style={{ fontSize: 14, color: C.muted }}>{t.origin}</span>
+      </div>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          background: C.card,
+          border: `1px solid ${C.line}`,
+          borderRadius: 16,
+          padding: 20,
+        }}
+      >
+        <div style={{ fontSize: 17, fontWeight: 600, color: C.ink }}>{t.setupTitle}</div>
+        <div style={{ fontSize: 13.5, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>
+          {t.setupDesc}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginTop: 16,
+            borderBottom: `1px solid ${C.line}`,
+            paddingBottom: 10,
+          }}
+        >
+          <input
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            inputMode="decimal"
+            placeholder="0"
+            autoFocus
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            style={{
+              flex: 1,
+              border: "none",
+              outline: "none",
+              fontFamily: MONO,
+              fontSize: 30,
+              fontWeight: 600,
+              color: C.ink,
+              background: "transparent",
+              minWidth: 0,
+              textAlign: t.dir === "rtl" ? "right" : "left",
+            }}
+          />
+          <span style={{ fontFamily: MONO, fontSize: 14, color: C.muted }}>SAR</span>
+        </div>
+        <button
+          onClick={submit}
+          disabled={busy}
+          style={{
+            width: "100%",
+            marginTop: 16,
+            border: "none",
+            background: C.emerald,
+            color: "#fff",
+            borderRadius: 12,
+            padding: "12px 16px",
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: busy ? "default" : "pointer",
+            fontFamily: SANS,
+            opacity: busy ? 0.6 : 1,
+          }}
+        >
+          {t.setupCta}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Tracker({ session, lang, setLang, t }) {
   const [txs, setTxs] = useState([]);
   const [starting, setStarting] = useState(50000);
   const [loading, setLoading] = useState(true);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [amount, setAmount] = useState("");
   const [desc, setDesc] = useState("");
   const [confirmId, setConfirmId] = useState(null);
   const [editStart, setEditStart] = useState(false);
   const [startDraft, setStartDraft] = useState("");
   const amountRef = useRef(null);
+  const descRef = useRef(null);
   const userId = session.user.id;
 
   useEffect(() => {
@@ -267,19 +384,12 @@ function Tracker({ session, lang, setLang, t }) {
         .order("created_at", { ascending: false });
       setTxs(rows || []);
 
-      let { data: s } = await supabase
+      const { data: s } = await supabase
         .from("fund_settings")
         .select("starting_balance")
         .maybeSingle();
-      if (!s) {
-        const { data: ins } = await supabase
-          .from("fund_settings")
-          .insert({ starting_balance: 50000 })
-          .select("starting_balance")
-          .single();
-        s = ins;
-      }
       if (s) setStarting(Number(s.starting_balance));
+      else setNeedsSetup(true); // no row yet → first-time user, show setup screen
       setLoading(false);
     })();
   }, []);
@@ -293,6 +403,7 @@ function Tracker({ session, lang, setLang, t }) {
     const description = desc.trim() || (lang === "ar" ? "بدون وصف" : "No description");
     setAmount("");
     setDesc("");
+    if (descRef.current) descRef.current.style.height = "auto"; // collapse the grown textarea
     amountRef.current?.focus();
     const { data, error } = await supabase
       .from("transactions")
@@ -320,6 +431,19 @@ function Tracker({ session, lang, setLang, t }) {
   };
 
   if (loading) return <Screen center>…</Screen>;
+
+  if (needsSetup)
+    return (
+      <Setup
+        lang={lang}
+        setLang={setLang}
+        t={t}
+        onDone={(v) => {
+          setStarting(v);
+          setNeedsSetup(false);
+        }}
+      />
+    );
 
   const totalSpent = txs.reduce((s, x) => s + Number(x.amount), 0);
   const remaining = starting - totalSpent;
@@ -503,21 +627,38 @@ function Tracker({ session, lang, setLang, t }) {
             />
             <span style={{ fontFamily: MONO, fontSize: 14, color: C.muted }}>SAR</span>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <input
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+            <textarea
+              ref={descRef}
               value={desc}
-              onChange={(e) => setDesc(e.target.value)}
+              onChange={(e) => {
+                setDesc(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = `${e.target.scrollHeight}px`;
+              }}
               placeholder={t.desc}
-              onKeyDown={(e) => e.key === "Enter" && addTx()}
+              rows={1}
+              onKeyDown={(e) => {
+                // Enter adds a newline (multi-line notes); ⌘/Ctrl+Enter records.
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  addTx();
+                }
+              }}
               style={{
                 flex: 1,
                 border: "none",
                 outline: "none",
                 fontFamily: SANS,
                 fontSize: 15,
+                lineHeight: 1.45,
                 color: C.ink,
                 background: "transparent",
                 minWidth: 0,
+                resize: "none",
+                overflowY: "auto",
+                maxHeight: 240,
+                padding: 0,
               }}
             />
             <button
@@ -559,7 +700,7 @@ function Tracker({ session, lang, setLang, t }) {
                 key={x.id}
                 style={{
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "flex-start",
                   justifyContent: "space-between",
                   padding: "13px 0",
                   borderBottom: `1px solid ${C.line}`,
@@ -570,9 +711,9 @@ function Tracker({ session, lang, setLang, t }) {
                     style={{
                       fontSize: 15,
                       color: C.ink,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      lineHeight: 1.45,
+                      whiteSpace: "pre-wrap",
+                      overflowWrap: "anywhere",
                     }}
                   >
                     {x.description}
