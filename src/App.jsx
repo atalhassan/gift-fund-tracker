@@ -210,8 +210,17 @@ function Auth({ lang, setLang, t }) {
   const submit = async () => {
     setErr("");
     setBusy(true);
-    const fn = mode === "signin" ? "signInWithPassword" : "signUp";
-    const { error } = await supabase.auth[fn]({ email, password: pw });
+    const { error } =
+      mode === "signin"
+        ? await supabase.auth.signInWithPassword({ email, password: pw })
+        : await supabase.auth.signUp({
+            email,
+            password: pw,
+            // Send the confirmation link back to whatever site we're on
+            // (the deployed URL in production, localhost in dev) instead of
+            // Supabase's default Site URL.
+            options: { emailRedirectTo: window.location.origin },
+          });
     if (error) setErr(error.message);
     setBusy(false);
   };
