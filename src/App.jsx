@@ -40,6 +40,7 @@ const STR = {
     setupTitle: "Set up your fund",
     setupDesc: "Enter the amount you're starting with. You can change it anytime with the pencil.",
     setupCta: "Start tracking",
+    detected: "Amount read from the message — edit if needed",
   },
   ar: {
     dir: "rtl",
@@ -61,11 +62,77 @@ const STR = {
     setupTitle: "إعداد رصيدك",
     setupDesc: "أدخل المبلغ الذي تبدأ به. يمكنك تغييره لاحقاً بالقلم.",
     setupCta: "ابدأ التتبّع",
+    detected: "تم استخراج المبلغ من الرسالة — عدّله إذا لزم",
   },
 };
 
 const fmt = (n) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n);
+
+// Normalize Arabic-Indic digits/separators to Western so numbers parse.
+const toWesternDigits = (s) =>
+  s
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/٫/g, ".") // Arabic decimal separator
+    .replace(/٬/g, ""); // Arabic thousands separator
+
+// Strip diacritics/tatweel and unify alef variants so keyword matching is robust.
+const normalizeAr = (s) =>
+  s
+    .replace(/[ً-ْٰ]/g, "")
+    .replace(/ـ/g, "")
+    .replace(/[آأإٱ]/g, "ا");
+
+// A number like 1,540.09 — allows thousands commas and a decimal part.
+const NUM = "([0-9][0-9,]*(?:\\.[0-9]+)?)";
+// Riyal currency token as written across SMS variants: SAR, SR, ريال, ر.س.
+const CUR = "(?:SAR|SR|ريال|ر\\.?\\s?س)";
+const toNum = (m) => {
+  if (!m) return null;
+  const n = parseFloat(m[1].replace(/,/g, ""));
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+// A riyal amount on a line, with the number on either side of the currency
+// token: "4.51 SAR" or "SR 91.85". Foreign amounts (e.g. 350 EUR) don't match.
+const riyalOnLine = (line) => {
+  const before = toNum(line.match(new RegExp(NUM + "\\s*" + CUR, "i")));
+  if (before != null) return before;
+  return toNum(line.match(new RegExp(CUR + "\\s*" + NUM, "i")));
+};
+
+// Pull the riyal amount to deduct out of a bank purchase SMS.
+// Priority: total amount due (incl. fees) → the "مبلغ" line → any other
+// purchase line carrying a riyal amount. Balance ("رصيد"), fee ("رسوم") and
+// exchange-rate ("سعر الصرف") lines are ignored so they can't be mistaken for
+// the charge. Returns null when nothing confident is found.
+function extractAmount(raw) {
+  if (!raw) return null;
+  const lines = raw.split("\n").map((l) => normalizeAr(toWesternDigits(l)));
+
+  // 1) إجمالي/اجمالي المبلغ المستحق — number after "المستحق" (always riyal).
+  const dueLine = lines.find((l) => l.includes("المستحق"));
+  if (dueLine) {
+    const v = toNum(dueLine.match(new RegExp("المستحق[^0-9]*" + NUM)));
+    if (v != null) return v;
+  }
+
+  // 2) The "مبلغ" line, when it carries a riyal amount (not a foreign one).
+  const amtLine = lines.find((l) => l.includes("مبلغ"));
+  if (amtLine) {
+    const v = riyalOnLine(amtLine);
+    if (v != null) return v;
+  }
+
+  // 3) Any remaining line with a riyal amount — e.g. "شراء … بـSR 91.85".
+  for (const l of lines) {
+    if (/رصيد|رسوم|سعر الصرف|المستحق|مبلغ/.test(l)) continue;
+    const v = riyalOnLine(l);
+    if (v != null) return v;
+  }
+  return null;
+}
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -369,6 +436,7 @@ function Tracker({ session, lang, setLang, t }) {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [amount, setAmount] = useState("");
   const [desc, setDesc] = useState("");
+  const [autoFilled, setAutoFilled] = useState(""); // amount we auto-extracted, to avoid clobbering manual edits
   const [confirmId, setConfirmId] = useState(null);
   const [editStart, setEditStart] = useState(false);
   const [startDraft, setStartDraft] = useState("");
@@ -403,6 +471,7 @@ function Tracker({ session, lang, setLang, t }) {
     const description = desc.trim() || (lang === "ar" ? "بدون وصف" : "No description");
     setAmount("");
     setDesc("");
+    setAutoFilled("");
     if (descRef.current) descRef.current.style.height = "auto"; // collapse the grown textarea
     amountRef.current?.focus();
     const { data, error } = await supabase
@@ -627,14 +696,35 @@ function Tracker({ session, lang, setLang, t }) {
             />
             <span style={{ fontFamily: MONO, fontSize: 14, color: C.muted }}>SAR</span>
           </div>
+          {amount !== "" && amount === autoFilled && (
+            <div
+              style={{
+                fontSize: 12,
+                color: C.emerald,
+                marginTop: -4,
+                marginBottom: 10,
+              }}
+            >
+              {t.detected}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
             <textarea
               ref={descRef}
               value={desc}
               onChange={(e) => {
-                setDesc(e.target.value);
+                const value = e.target.value;
+                setDesc(value);
                 e.target.style.height = "auto";
                 e.target.style.height = `${e.target.scrollHeight}px`;
+                // Auto-fill the amount from a pasted bank SMS, unless the user
+                // has already typed a different amount by hand.
+                const parsed = extractAmount(value);
+                if (parsed != null) {
+                  const p = String(parsed);
+                  setAmount((cur) => (cur === "" || cur === autoFilled ? p : cur));
+                  setAutoFilled(p);
+                }
               }}
               placeholder={t.desc}
               rows={1}
