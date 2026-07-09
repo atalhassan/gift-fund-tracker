@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Check, Pencil, X, LogOut } from "lucide-react";
+import { Plus, Trash2, Check, Pencil, X, LogOut, ClipboardPaste } from "lucide-react";
 import { supabase } from "./supabase.js";
 
 // ── Palette: a warm ledger book. Green ink for what remains, clay for what's gone,
@@ -41,6 +41,7 @@ const STR = {
     setupDesc: "Enter the amount you're starting with. You can change it anytime with the pencil.",
     setupCta: "Start tracking",
     detected: "Amount read from the message — edit if needed",
+    paste: "Paste bank message",
   },
   ar: {
     dir: "rtl",
@@ -63,6 +64,7 @@ const STR = {
     setupDesc: "أدخل المبلغ الذي تبدأ به. يمكنك تغييره لاحقاً بالقلم.",
     setupCta: "ابدأ التتبّع",
     detected: "تم استخراج المبلغ من الرسالة — عدّله إذا لزم",
+    paste: "لصق رسالة البنك",
   },
 };
 
@@ -462,6 +464,36 @@ function Tracker({ session, lang, setLang, t }) {
     })();
   }, []);
 
+  // Keep the note textarea sized to its content (handles typing and paste alike).
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [desc]);
+
+  // Set the note and auto-fill the amount from it, without clobbering an
+  // amount the user typed by hand.
+  const applyDesc = (value) => {
+    setDesc(value);
+    const parsed = extractAmount(value);
+    if (parsed != null) {
+      const p = String(parsed);
+      setAmount((cur) => (cur === "" || cur === autoFilled ? p : cur));
+      setAutoFilled(p);
+    }
+  };
+
+  const pasteMessage = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) applyDesc(text);
+    } catch {
+      // Clipboard read blocked/unsupported — focus so the user can paste manually.
+    }
+    descRef.current?.focus();
+  };
+
   const addTx = async () => {
     const val = parseFloat(amount);
     if (!val || val <= 0) {
@@ -470,9 +502,8 @@ function Tracker({ session, lang, setLang, t }) {
     }
     const description = desc.trim() || (lang === "ar" ? "بدون وصف" : "No description");
     setAmount("");
-    setDesc("");
+    setDesc(""); // the [desc] effect collapses the grown textarea
     setAutoFilled("");
-    if (descRef.current) descRef.current.style.height = "auto"; // collapse the grown textarea
     amountRef.current?.focus();
     const { data, error } = await supabase
       .from("transactions")
@@ -664,6 +695,28 @@ function Tracker({ session, lang, setLang, t }) {
             boxShadow: "0 1px 2px rgba(28,42,35,.04)",
           }}
         >
+          <button
+            onClick={pasteMessage}
+            style={{
+              width: "100%",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              border: `1px dashed ${C.line}`,
+              background: C.paper,
+              color: C.muted,
+              borderRadius: 12,
+              padding: "10px 12px",
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: SANS,
+              marginBottom: 14,
+            }}
+          >
+            <ClipboardPaste size={16} /> {t.paste}
+          </button>
           <div
             style={{
               display: "flex",
@@ -712,20 +765,7 @@ function Tracker({ session, lang, setLang, t }) {
             <textarea
               ref={descRef}
               value={desc}
-              onChange={(e) => {
-                const value = e.target.value;
-                setDesc(value);
-                e.target.style.height = "auto";
-                e.target.style.height = `${e.target.scrollHeight}px`;
-                // Auto-fill the amount from a pasted bank SMS, unless the user
-                // has already typed a different amount by hand.
-                const parsed = extractAmount(value);
-                if (parsed != null) {
-                  const p = String(parsed);
-                  setAmount((cur) => (cur === "" || cur === autoFilled ? p : cur));
-                  setAutoFilled(p);
-                }
-              }}
+              onChange={(e) => applyDesc(e.target.value)}
               placeholder={t.desc}
               rows={1}
               onKeyDown={(e) => {
