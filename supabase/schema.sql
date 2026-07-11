@@ -1,14 +1,21 @@
 -- Gift Fund Tracker — database schema
 -- Run this once in the Supabase SQL Editor (Dashboard → SQL Editor → New query → paste → Run).
 
--- 1. Transactions: one row per recorded expense.
+-- 1. Transactions: one row per recorded expense or credit.
+--    `kind` = 'expense' subtracts from the fund; 'credit' adds to it.
 create table if not exists public.transactions (
   id          bigint generated always as identity primary key,
   user_id     uuid not null default auth.uid() references auth.users (id) on delete cascade,
   amount      numeric(14, 2) not null check (amount > 0),
   description text not null,
+  kind        text not null default 'expense' check (kind in ('expense', 'credit')),
   created_at  timestamptz not null default now()
 );
+
+-- Add `kind` to transactions tables created before this column existed.
+alter table public.transactions add column if not exists kind text not null default 'expense';
+alter table public.transactions drop constraint if exists transactions_kind_check;
+alter table public.transactions add constraint transactions_kind_check check (kind in ('expense', 'credit'));
 
 -- 2. Per-user settings: the starting gift amount and the fund's title.
 create table if not exists public.fund_settings (

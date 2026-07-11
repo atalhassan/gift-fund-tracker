@@ -44,6 +44,12 @@ const STR = {
     paste: "Paste bank message",
     editTitle: "Edit fund title",
     titlePlaceholder: "Name this fund",
+    tabSpend: "Spend",
+    tabCredit: "Add funds",
+    addCredit: "Add",
+    creditDesc: "Where from? (e.g. another gift)",
+    noCredit: "Added funds",
+    credited: "added",
   },
   ar: {
     dir: "rtl",
@@ -69,6 +75,12 @@ const STR = {
     paste: "لصق رسالة البنك",
     editTitle: "تعديل عنوان الرصيد",
     titlePlaceholder: "سمِّ هذا الرصيد",
+    tabSpend: "صرف",
+    tabCredit: "إضافة رصيد",
+    addCredit: "إضافة",
+    creditDesc: "من أين؟ (مثال: هدية أخرى)",
+    noCredit: "رصيد مُضاف",
+    credited: "مُضاف",
   },
 };
 
@@ -452,6 +464,7 @@ function Tracker({ session, lang, setLang, t }) {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [amount, setAmount] = useState("");
   const [desc, setDesc] = useState("");
+  const [entryKind, setEntryKind] = useState("expense"); // 'expense' | 'credit'
   const [autoFilled, setAutoFilled] = useState(""); // amount we auto-extracted, to avoid clobbering manual edits
   const [confirmId, setConfirmId] = useState(null);
   const [editStart, setEditStart] = useState(false);
@@ -519,14 +532,16 @@ function Tracker({ session, lang, setLang, t }) {
       amountRef.current?.focus();
       return;
     }
-    const description = desc.trim() || (lang === "ar" ? "بدون وصف" : "No description");
+    const fallback =
+      entryKind === "credit" ? t.noCredit : lang === "ar" ? "بدون وصف" : "No description";
+    const description = desc.trim() || fallback;
     setAmount("");
     setDesc(""); // the [desc] effect collapses the grown textarea
     setAutoFilled("");
     amountRef.current?.focus();
     const { data, error } = await supabase
       .from("transactions")
-      .insert({ amount: val, description })
+      .insert({ amount: val, description, kind: entryKind })
       .select()
       .single();
     if (!error && data) setTxs((prev) => [data, ...prev]);
@@ -573,9 +588,11 @@ function Tracker({ session, lang, setLang, t }) {
       />
     );
 
-  const totalSpent = txs.reduce((s, x) => s + Number(x.amount), 0);
-  const remaining = starting - totalSpent;
-  const pctSpent = Math.min(100, Math.max(0, (totalSpent / starting) * 100));
+  const totalSpent = txs.reduce((s, x) => (x.kind === "credit" ? s : s + Number(x.amount)), 0);
+  const totalCredit = txs.reduce((s, x) => (x.kind === "credit" ? s + Number(x.amount) : s), 0);
+  const totalFund = starting + totalCredit; // the base gift plus any credits added since
+  const remaining = totalFund - totalSpent;
+  const pctSpent = totalFund > 0 ? Math.min(100, Math.max(0, (totalSpent / totalFund) * 100)) : 0;
   const over = remaining < 0;
 
   const dateFmt = (iso) =>
@@ -722,8 +739,15 @@ function Tracker({ session, lang, setLang, t }) {
               fontFamily: MONO,
             }}
           >
-            <span>
-              {fmt(totalSpent)} {t.spent}
+            <span style={{ display: "inline-flex", gap: 8, alignItems: "baseline" }}>
+              <span>
+                {fmt(totalSpent)} {t.spent}
+              </span>
+              {totalCredit > 0 && (
+                <span style={{ color: C.emerald }}>
+                  +{fmt(totalCredit)} {t.credited}
+                </span>
+              )}
             </span>
             {editStart ? (
               <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
@@ -771,28 +795,71 @@ function Tracker({ session, lang, setLang, t }) {
             boxShadow: "0 1px 2px rgba(28,42,35,.04)",
           }}
         >
-          <button
-            onClick={pasteMessage}
+          {/* Spend / Add-funds toggle */}
+          <div
             style={{
-              width: "100%",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              border: `1px dashed ${C.line}`,
+              display: "flex",
+              gap: 4,
+              padding: 3,
               background: C.paper,
-              color: C.muted,
+              border: `1px solid ${C.line}`,
               borderRadius: 12,
-              padding: "10px 12px",
-              fontSize: 13.5,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: SANS,
               marginBottom: 14,
             }}
           >
-            <ClipboardPaste size={16} /> {t.paste}
-          </button>
+            {[
+              { k: "expense", label: t.tabSpend },
+              { k: "credit", label: t.tabCredit },
+            ].map(({ k, label }) => {
+              const active = entryKind === k;
+              return (
+                <button
+                  key={k}
+                  onClick={() => setEntryKind(k)}
+                  style={{
+                    flex: 1,
+                    border: "none",
+                    borderRadius: 9,
+                    padding: "8px 10px",
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    fontFamily: SANS,
+                    cursor: "pointer",
+                    background: active ? C.card : "transparent",
+                    color: active ? (k === "credit" ? C.emerald : C.ink) : C.muted,
+                    boxShadow: active ? "0 1px 2px rgba(28,42,35,.06)" : "none",
+                    transition: "color .15s ease",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {entryKind === "expense" && (
+            <button
+              onClick={pasteMessage}
+              style={{
+                width: "100%",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                border: `1px dashed ${C.line}`,
+                background: C.paper,
+                color: C.muted,
+                borderRadius: 12,
+                padding: "10px 12px",
+                fontSize: 13.5,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: SANS,
+                marginBottom: 14,
+              }}
+            >
+              <ClipboardPaste size={16} /> {t.paste}
+            </button>
+          )}
           <div
             style={{
               display: "flex",
@@ -842,7 +909,7 @@ function Tracker({ session, lang, setLang, t }) {
               ref={descRef}
               value={desc}
               onChange={(e) => applyDesc(e.target.value)}
-              placeholder={t.desc}
+              placeholder={entryKind === "credit" ? t.creditDesc : t.desc}
               rows={1}
               onKeyDown={(e) => {
                 // Enter adds a newline (multi-line notes); ⌘/Ctrl+Enter records.
@@ -885,7 +952,7 @@ function Tracker({ session, lang, setLang, t }) {
                 flexShrink: 0,
               }}
             >
-              <Plus size={16} /> {t.add}
+              <Plus size={16} /> {entryKind === "credit" ? t.addCredit : t.add}
             </button>
           </div>
         </div>
@@ -929,8 +996,16 @@ function Tracker({ session, lang, setLang, t }) {
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginInlineStart: 12 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 15, color: C.spent, fontWeight: 600 }}>
-                    −{fmt(Number(x.amount))}
+                  <span
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 15,
+                      color: x.kind === "credit" ? C.emerald : C.spent,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {x.kind === "credit" ? "+" : "−"}
+                    {fmt(Number(x.amount))}
                   </span>
                   {confirmId === x.id ? (
                     <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
