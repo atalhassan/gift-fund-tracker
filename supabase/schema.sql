@@ -10,11 +10,15 @@ create table if not exists public.transactions (
   created_at  timestamptz not null default now()
 );
 
--- 2. Per-user settings: the starting gift amount.
+-- 2. Per-user settings: the starting gift amount and the fund's title.
 create table if not exists public.fund_settings (
   user_id          uuid primary key default auth.uid() references auth.users (id) on delete cascade,
-  starting_balance numeric(14, 2) not null default 50000
+  starting_balance numeric(14, 2) not null default 50000,
+  title            text
 );
+
+-- Add `title` to fund_settings created before this column existed.
+alter table public.fund_settings add column if not exists title text;
 
 -- 3. Row-Level Security: each user sees and edits only their own rows.
 alter table public.transactions  enable row level security;

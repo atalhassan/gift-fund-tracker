@@ -42,6 +42,8 @@ const STR = {
     setupCta: "Start tracking",
     detected: "Amount read from the message — edit if needed",
     paste: "Paste bank message",
+    editTitle: "Edit fund title",
+    titlePlaceholder: "Name this fund",
   },
   ar: {
     dir: "rtl",
@@ -65,6 +67,8 @@ const STR = {
     setupCta: "ابدأ التتبّع",
     detected: "تم استخراج المبلغ من الرسالة — عدّله إذا لزم",
     paste: "لصق رسالة البنك",
+    editTitle: "تعديل عنوان الرصيد",
+    titlePlaceholder: "سمِّ هذا الرصيد",
   },
 };
 
@@ -443,6 +447,7 @@ function Setup({ lang, setLang, t, onDone }) {
 function Tracker({ session, lang, setLang, t }) {
   const [txs, setTxs] = useState([]);
   const [starting, setStarting] = useState(50000);
+  const [title, setTitle] = useState(""); // custom fund title; empty → fall back to t.origin
   const [loading, setLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [amount, setAmount] = useState("");
@@ -451,6 +456,8 @@ function Tracker({ session, lang, setLang, t }) {
   const [confirmId, setConfirmId] = useState(null);
   const [editStart, setEditStart] = useState(false);
   const [startDraft, setStartDraft] = useState("");
+  const [editTitle, setEditTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   const amountRef = useRef(null);
   const descRef = useRef(null);
   const userId = session.user.id;
@@ -465,9 +472,12 @@ function Tracker({ session, lang, setLang, t }) {
 
       const { data: s } = await supabase
         .from("fund_settings")
-        .select("starting_balance")
+        .select("starting_balance, title")
         .maybeSingle();
-      if (s) setStarting(Number(s.starting_balance));
+      if (s) {
+        setStarting(Number(s.starting_balance));
+        setTitle(s.title || "");
+      }
       else setNeedsSetup(true); // no row yet → first-time user, show setup screen
       setLoading(false);
     })();
@@ -539,6 +549,15 @@ function Tracker({ session, lang, setLang, t }) {
     }
   };
 
+  const saveTitle = async () => {
+    const next = titleDraft.trim();
+    setEditTitle(false);
+    setTitle(next);
+    await supabase
+      .from("fund_settings")
+      .upsert({ user_id: userId, title: next || null }, { onConflict: "user_id" });
+  };
+
   if (loading) return <Screen center>…</Screen>;
 
   if (needsSetup)
@@ -590,13 +609,61 @@ function Tracker({ session, lang, setLang, t }) {
             alignItems: "center",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ width: 22, height: 2, background: C.gold, display: "inline-block" }} />
-            <span style={{ fontSize: 13, letterSpacing: 0.3, color: C.muted }}>
-              {t.origin}
-            </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <span style={{ width: 22, height: 2, background: C.gold, display: "inline-block", flexShrink: 0 }} />
+            {editTitle ? (
+              <span style={{ display: "inline-flex", gap: 6, alignItems: "center", minWidth: 0 }}>
+                <input
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  placeholder={t.titlePlaceholder}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveTitle();
+                    if (e.key === "Escape") setEditTitle(false);
+                  }}
+                  style={{
+                    fontSize: 13,
+                    color: C.ink,
+                    border: `1px solid ${C.line}`,
+                    borderRadius: 6,
+                    padding: "3px 7px",
+                    outline: "none",
+                    minWidth: 0,
+                    width: 180,
+                    maxWidth: "100%",
+                    textAlign: t.dir === "rtl" ? "right" : "left",
+                  }}
+                />
+                <Check size={15} color={C.emerald} style={{ cursor: "pointer", flexShrink: 0 }} onClick={saveTitle} />
+                <X size={15} color={C.muted} style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => setEditTitle(false)} />
+              </span>
+            ) : (
+              <span
+                title={t.editTitle}
+                onClick={() => {
+                  setTitleDraft(title);
+                  setEditTitle(true);
+                }}
+                style={{
+                  display: "inline-flex",
+                  gap: 5,
+                  alignItems: "center",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  letterSpacing: 0.3,
+                  color: C.muted,
+                  minWidth: 0,
+                }}
+              >
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {title || t.origin}
+                </span>
+                <Pencil size={12} color={C.muted} style={{ flexShrink: 0 }} />
+              </span>
+            )}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             <LangToggle lang={lang} setLang={setLang} />
             <LogOut
               size={18}
