@@ -598,7 +598,10 @@ function Tracker({ session, lang, setLang, t }) {
   const totalCredit = txs.reduce((s, x) => (x.kind === "credit" ? s + Number(x.amount) : s), 0);
   const totalFund = starting + totalCredit; // the base gift plus any credits added since
   const remaining = totalFund - totalSpent;
-  const pctSpent = totalFund > 0 ? Math.min(100, Math.max(0, (totalSpent / totalFund) * 100)) : 0;
+  // The bar scales net spending against the *initial* fund, so it fills as the
+  // gift runs low (a signal to add credit) and drops back when credit is added.
+  const netSpent = totalSpent - totalCredit;
+  const pctSpent = starting > 0 ? Math.min(100, Math.max(0, (netSpent / starting) * 100)) : 0;
   const over = remaining < 0;
 
   const dateFmt = (iso) =>
@@ -783,7 +786,7 @@ function Tracker({ session, lang, setLang, t }) {
                   setEditStart(true);
                 }}
               >
-                {t.of} {fmt(totalFund)}
+                {t.of} {fmt(starting)}
                 <Pencil size={12} color={C.muted} />
               </span>
             )}
