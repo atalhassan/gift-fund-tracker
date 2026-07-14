@@ -598,10 +598,9 @@ function Tracker({ session, lang, setLang, t }) {
   const totalCredit = txs.reduce((s, x) => (x.kind === "credit" ? s + Number(x.amount) : s), 0);
   const totalFund = starting + totalCredit; // the base gift plus any credits added since
   const remaining = totalFund - totalSpent;
-  // The bar scales net spending against the *initial* fund, so it fills as the
-  // gift runs low (a signal to add credit) and drops back when credit is added.
-  const netSpent = totalSpent - totalCredit;
-  const pctSpent = starting > 0 ? Math.min(100, Math.max(0, (netSpent / starting) * 100)) : 0;
+  // Vertical gauge shows what's left of the initial fund: full green when
+  // healthy, emptying as the gift runs low (a signal to add credit).
+  const pctRemaining = starting > 0 ? Math.min(100, Math.max(0, (remaining / starting) * 100)) : 0;
   const over = remaining < 0;
 
   const dateFmt = (iso) =>
@@ -702,6 +701,31 @@ function Tracker({ session, lang, setLang, t }) {
 
         {/* Balance */}
         <div style={{ padding: "18px 22px 22px" }}>
+         <div style={{ display: "flex", gap: 16, alignItems: "stretch" }}>
+          {/* Vertical fund gauge: full green = money left, empties as the fund runs low */}
+          <div
+            style={{
+              position: "relative",
+              width: 10,
+              minHeight: 88,
+              background: C.emeraldSoft,
+              borderRadius: 5,
+              overflow: "hidden",
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                insetInline: 0,
+                bottom: 0,
+                height: `${pctRemaining}%`,
+                background: over ? C.spent : C.emerald,
+                transition: "height .3s ease",
+              }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}>{t.remaining}</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span
@@ -717,25 +741,6 @@ function Tracker({ session, lang, setLang, t }) {
               {fmt(remaining)}
             </span>
             <span style={{ fontFamily: MONO, fontSize: 15, color: C.muted }}>SAR</span>
-          </div>
-
-          <div
-            style={{
-              marginTop: 16,
-              height: 6,
-              background: C.emeraldSoft,
-              borderRadius: 4,
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: `${pctSpent}%`,
-                height: "100%",
-                background: over ? C.spent : C.gold,
-                transition: "width .3s ease",
-              }}
-            />
           </div>
 
           <div
@@ -791,6 +796,8 @@ function Tracker({ session, lang, setLang, t }) {
               </span>
             )}
           </div>
+          </div>
+         </div>
         </div>
 
         {/* Entry card */}
