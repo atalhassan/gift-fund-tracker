@@ -5,15 +5,15 @@ import { supabase } from "./supabase.js";
 // ── Palette: a warm ledger book. Green ink for what remains, clay for what's gone,
 //    a single gold thread marking the origin of the money.
 const C = {
-  paper: "#F6F3EC",
-  card: "#FFFFFF",
+  paper: "#E6E0D2",
+  card: "#F2EEE4",
   ink: "#1C2A23",
   emerald: "#0E6B4C",
   emeraldSoft: "#E4EFE9",
   gold: "#B08A3E",
   muted: "#71807A",
   spent: "#A8452F",
-  line: "#E7E2D6",
+  line: "#D8D1C1",
 };
 
 const MONO = "'SF Mono', 'SFMono-Regular', 'Menlo', 'Consolas', monospace";
