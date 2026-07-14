@@ -605,6 +605,7 @@ function Tracker({ session, lang, setLang, t }) {
   // healthy, emptying as the gift runs low (a signal to add credit).
   const pctRemaining = starting > 0 ? Math.min(100, Math.max(0, (remaining / starting) * 100)) : 0;
   const over = remaining < 0;
+  const low = pctRemaining <= 20; // gauge turns red once the fund is down to a fifth
 
   const dateFmt = (iso) =>
     new Date(iso).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-GB", {
@@ -723,7 +724,7 @@ function Tracker({ session, lang, setLang, t }) {
                 insetInline: 0,
                 bottom: 0,
                 height: `${pctRemaining}%`,
-                background: over ? C.spentGrad : C.emeraldGrad,
+                background: low ? C.spentGrad : C.emeraldGrad,
                 transition: "height .3s ease",
               }}
             />
