@@ -783,7 +783,7 @@ function Tracker({ session, lang, setLang, t }) {
                   setEditStart(true);
                 }}
               >
-                {t.of} {fmt(starting)}
+                {t.of} {fmt(totalFund)}
                 <Pencil size={12} color={C.muted} />
               </span>
             )}
