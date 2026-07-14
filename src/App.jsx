@@ -39,6 +39,23 @@ const STR = {
     password: "Password",
     toSignup: "Need an account? Create one",
     toSignin: "Have an account? Sign in",
+    authHeadSignin: "Welcome back",
+    authSubSignin: "Sign in to open your ledger.",
+    authHeadSignup: "Create your account",
+    authSubSignup: "A private ledger for a gift fund — track what you spend and what remains.",
+    pwHint: "At least 6 characters",
+    working: "One moment…",
+    confirmTitle: "Check your email",
+    confirmBody: (email) =>
+      `We sent a confirmation link to ${email}. Open it, then come back and sign in.`,
+    backToSignin: "Back to sign in",
+    errFill: "Enter your email and password.",
+    errEmail: "That doesn't look like a valid email address.",
+    errCreds: "Wrong email or password.",
+    errExists: "This email already has an account — sign in instead.",
+    errShortPw: "Password must be at least 6 characters.",
+    errUnconfirmed: "Please confirm your email first — check your inbox.",
+    errRate: "Too many attempts — wait a moment and try again.",
     signout: "Sign out",
     setupTitle: "Set up your fund",
     setupDesc: "Enter the amount you're starting with. You can change it anytime with the pencil.",
@@ -70,6 +87,22 @@ const STR = {
     password: "كلمة المرور",
     toSignup: "لا تملك حساباً؟ أنشئ واحداً",
     toSignin: "لديك حساب؟ سجّل الدخول",
+    authHeadSignin: "مرحباً بعودتك",
+    authSubSignin: "سجّل الدخول لفتح دفترك.",
+    authHeadSignup: "أنشئ حسابك",
+    authSubSignup: "دفتر خاص لرصيد الهدية — تتبّع ما تصرفه وما يتبقّى.",
+    pwHint: "٦ أحرف على الأقل",
+    working: "لحظة…",
+    confirmTitle: "تحقّق من بريدك",
+    confirmBody: (email) => `أرسلنا رابط تأكيد إلى ${email}. افتحه ثم عد وسجّل الدخول.`,
+    backToSignin: "العودة لتسجيل الدخول",
+    errFill: "أدخل بريدك الإلكتروني وكلمة المرور.",
+    errEmail: "البريد الإلكتروني غير صالح.",
+    errCreds: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+    errExists: "هذا البريد مسجّل بالفعل — سجّل الدخول بدلاً من ذلك.",
+    errShortPw: "كلمة المرور يجب أن تكون ٦ أحرف على الأقل.",
+    errUnconfirmed: "أكّد بريدك الإلكتروني أولاً — تحقّق من صندوق الوارد.",
+    errRate: "محاولات كثيرة — انتظر قليلاً ثم أعد المحاولة.",
     signout: "تسجيل الخروج",
     setupTitle: "إعداد رصيدك",
     setupDesc: "أدخل المبلغ الذي تبدأ به. يمكنك تغييره لاحقاً بالقلم.",
@@ -97,6 +130,17 @@ const toWesternDigits = (s) =>
     .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
     .replace(/٫/g, ".") // Arabic decimal separator
     .replace(/٬/g, ""); // Arabic thousands separator
+
+// Sanitize what a user types into an amount field: accept English or Arabic
+// digits, drop everything else (letters, symbols, thousands commas), and keep
+// at most one decimal point. Returns a Western-digit string that parseFloat reads.
+const sanitizeAmount = (s) => {
+  const western = toWesternDigits(s).replace(/[^0-9.]/g, "");
+  const dot = western.indexOf(".");
+  return dot === -1
+    ? western
+    : western.slice(0, dot + 1) + western.slice(dot + 1).replace(/\./g, "");
+};
 
 // Strip diacritics/tatweel and unify alef variants so keyword matching is robust.
 const normalizeAr = (s) =>
@@ -225,28 +269,48 @@ function LangToggle({ lang, setLang }) {
   );
 }
 
+// Translate the common Supabase auth errors; fall back to the raw message.
+const authErrText = (msg, t) => {
+  const m = msg.toLowerCase();
+  if (m.includes("invalid login credentials")) return t.errCreds;
+  if (m.includes("already registered")) return t.errExists;
+  if (m.includes("at least 6")) return t.errShortPw;
+  if (m.includes("not confirmed")) return t.errUnconfirmed;
+  if (m.includes("rate limit") || m.includes("too many")) return t.errRate;
+  return msg;
+};
+
 function Auth({ lang, setLang, t }) {
   const [mode, setMode] = useState("signin");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [sentTo, setSentTo] = useState(""); // signup done → confirmation email sent here
+  const pwRef = useRef(null);
 
   const submit = async () => {
+    const em = email.trim();
+    if (!em || !pw) return setErr(t.errFill);
+    if (!/^\S+@\S+\.\S+$/.test(em)) return setErr(t.errEmail);
+    if (mode === "signup" && pw.length < 6) return setErr(t.errShortPw);
     setErr("");
     setBusy(true);
-    const { error } =
+    const { data, error } =
       mode === "signin"
-        ? await supabase.auth.signInWithPassword({ email, password: pw })
+        ? await supabase.auth.signInWithPassword({ email: em, password: pw })
         : await supabase.auth.signUp({
-            email,
+            email: em,
             password: pw,
             // Send the confirmation link back to whatever site we're on
             // (the deployed URL in production, localhost in dev) instead of
             // Supabase's default Site URL.
             options: { emailRedirectTo: window.location.origin },
           });
-    if (error) setErr(error.message);
+    if (error) setErr(authErrText(error.message, t));
+    // Signup without a session means "confirm your email" — tell the user,
+    // instead of leaving them staring at an inert form.
+    else if (mode === "signup" && !data.session) setSentTo(em);
     setBusy(false);
   };
 
@@ -282,63 +346,107 @@ function Auth({ lang, setLang, t }) {
           padding: 20,
         }}
       >
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder={t.email}
-          type="email"
-          autoCapitalize="none"
-          style={inputStyle}
-        />
-        <input
-          value={pw}
-          onChange={(e) => setPw(e.target.value)}
-          placeholder={t.password}
-          type="password"
-          onKeyDown={(e) => e.key === "Enter" && submit()}
-          style={{ ...inputStyle, marginTop: 10 }}
-        />
-        {err && (
-          <div style={{ color: C.spent, fontSize: 13, marginTop: 10 }}>{err}</div>
+        {sentTo ? (
+          <>
+            <div style={{ fontSize: 17, fontWeight: 600 }}>{t.confirmTitle}</div>
+            <div style={{ fontSize: 13.5, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>
+              {t.confirmBody(sentTo)}
+            </div>
+            <button
+              onClick={() => {
+                setSentTo("");
+                setMode("signin");
+                setPw("");
+              }}
+              style={{
+                width: "100%",
+                marginTop: 16,
+                border: "none",
+                background: C.emeraldGrad,
+                color: "#fff",
+                borderRadius: 12,
+                padding: "12px 16px",
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: SANS,
+              }}
+            >
+              {t.backToSignin}
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 19, fontWeight: 600 }}>
+              {mode === "signin" ? t.authHeadSignin : t.authHeadSignup}
+            </div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 4, marginBottom: 16, lineHeight: 1.6 }}>
+              {mode === "signin" ? t.authSubSignin : t.authSubSignup}
+            </div>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={t.email}
+              type="email"
+              autoCapitalize="none"
+              onKeyDown={(e) => e.key === "Enter" && pwRef.current?.focus()}
+              style={inputStyle}
+            />
+            <input
+              ref={pwRef}
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              placeholder={t.password}
+              type="password"
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+              style={{ ...inputStyle, marginTop: 10 }}
+            />
+            {mode === "signup" && !err && (
+              <div style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>{t.pwHint}</div>
+            )}
+            {err && (
+              <div style={{ color: C.spent, fontSize: 13, marginTop: 10 }}>{err}</div>
+            )}
+            <button
+              onClick={submit}
+              disabled={busy}
+              style={{
+                width: "100%",
+                marginTop: 14,
+                border: "none",
+                background: C.emeraldGrad,
+                color: "#fff",
+                borderRadius: 12,
+                padding: "12px 16px",
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: busy ? "default" : "pointer",
+                fontFamily: SANS,
+                opacity: busy ? 0.6 : 1,
+              }}
+            >
+              {busy ? t.working : mode === "signin" ? t.signin : t.signup}
+            </button>
+            <button
+              onClick={() => {
+                setErr("");
+                setMode(mode === "signin" ? "signup" : "signin");
+              }}
+              style={{
+                width: "100%",
+                marginTop: 12,
+                border: "none",
+                background: "transparent",
+                color: C.muted,
+                fontSize: 13,
+                cursor: "pointer",
+                fontFamily: SANS,
+              }}
+            >
+              {mode === "signin" ? t.toSignup : t.toSignin}
+            </button>
+          </>
         )}
-        <button
-          onClick={submit}
-          disabled={busy}
-          style={{
-            width: "100%",
-            marginTop: 14,
-            border: "none",
-            background: C.emeraldGrad,
-            color: "#fff",
-            borderRadius: 12,
-            padding: "12px 16px",
-            fontSize: 15,
-            fontWeight: 600,
-            cursor: busy ? "default" : "pointer",
-            fontFamily: SANS,
-            opacity: busy ? 0.6 : 1,
-          }}
-        >
-          {mode === "signin" ? t.signin : t.signup}
-        </button>
-        <button
-          onClick={() => {
-            setErr("");
-            setMode(mode === "signin" ? "signup" : "signin");
-          }}
-          style={{
-            width: "100%",
-            marginTop: 12,
-            border: "none",
-            background: "transparent",
-            color: C.muted,
-            fontSize: 13,
-            cursor: "pointer",
-            fontFamily: SANS,
-          }}
-        >
-          {mode === "signin" ? t.toSignup : t.toSignin}
-        </button>
       </div>
     </div>
   );
@@ -420,7 +528,7 @@ function Setup({ lang, setLang, t, onDone }) {
         >
           <input
             value={val}
-            onChange={(e) => setVal(e.target.value)}
+            onChange={(e) => setVal(sanitizeAmount(e.target.value))}
             inputMode="decimal"
             placeholder="0"
             autoFocus
@@ -761,7 +869,7 @@ function Tracker({ session, lang, setLang, t }) {
               <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                 <input
                   value={startDraft}
-                  onChange={(e) => setStartDraft(e.target.value)}
+                  onChange={(e) => setStartDraft(sanitizeAmount(e.target.value))}
                   inputMode="decimal"
                   autoFocus
                   style={{
@@ -883,7 +991,7 @@ function Tracker({ session, lang, setLang, t }) {
             <input
               ref={amountRef}
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => setAmount(sanitizeAmount(e.target.value))}
               inputMode="decimal"
               placeholder="0"
               onKeyDown={(e) => e.key === "Enter" && addTx()}
