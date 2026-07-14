@@ -753,16 +753,6 @@ function Tracker({ session, lang, setLang, t }) {
               fontFamily: MONO,
             }}
           >
-            <span style={{ display: "inline-flex", gap: 8, alignItems: "baseline" }}>
-              <span style={{ color: C.spent }}>
-                {fmt(totalSpent)} {t.spent}
-              </span>
-              {totalCredit > 0 && (
-                <span style={{ color: C.emerald }}>
-                  +{fmt(totalCredit)} {t.credited}
-                </span>
-              )}
-            </span>
             {editStart ? (
               <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                 <input
