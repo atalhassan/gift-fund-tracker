@@ -5,14 +5,17 @@ import { supabase } from "./supabase.js";
 // ── Palette: a warm ledger book. Green ink for what remains, clay for what's gone,
 //    a single gold thread marking the origin of the money.
 const C = {
-  paper: "#E6E0D2",
-  card: "#F2EEE4",
+  // Surfaces are smooth warm gradients; solid tokens stay for text, icons and borders.
+  paper: "linear-gradient(160deg, #ECE6DA 0%, #E1DAC9 100%)",
+  card: "linear-gradient(160deg, #F5F1E8 0%, #ECE7DB 100%)",
   ink: "#1C2A23",
   emerald: "#0E6B4C",
+  emeraldGrad: "linear-gradient(160deg, #14855F 0%, #0B5A3F 100%)",
   emeraldSoft: "#E4EFE9",
   gold: "#B08A3E",
   muted: "#71807A",
   spent: "#A8452F",
+  spentGrad: "linear-gradient(160deg, #BB4E37 0%, #963A26 100%)",
   line: "#D8D1C1",
 };
 
@@ -305,7 +308,7 @@ function Auth({ lang, setLang, t }) {
             width: "100%",
             marginTop: 14,
             border: "none",
-            background: C.emerald,
+            background: C.emeraldGrad,
             color: "#fff",
             borderRadius: 12,
             padding: "12px 16px",
@@ -444,7 +447,7 @@ function Setup({ lang, setLang, t, onDone }) {
             width: "100%",
             marginTop: 16,
             border: "none",
-            background: C.emerald,
+            background: C.emeraldGrad,
             color: "#fff",
             borderRadius: 12,
             padding: "12px 16px",
@@ -720,7 +723,7 @@ function Tracker({ session, lang, setLang, t }) {
                 insetInline: 0,
                 bottom: 0,
                 height: `${pctRemaining}%`,
-                background: over ? C.spent : C.emerald,
+                background: over ? C.spentGrad : C.emeraldGrad,
                 transition: "height .3s ease",
               }}
             />
@@ -947,7 +950,7 @@ function Tracker({ session, lang, setLang, t }) {
                 alignItems: "center",
                 gap: 6,
                 border: "none",
-                background: C.emerald,
+                background: C.emeraldGrad,
                 color: "#fff",
                 borderRadius: 12,
                 padding: "10px 16px",
