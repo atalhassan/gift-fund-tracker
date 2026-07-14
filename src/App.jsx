@@ -155,8 +155,14 @@ function extractAmount(raw) {
 export default function App() {
   const [session, setSession] = useState(null);
   const [authReady, setAuthReady] = useState(false);
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(
+    () => localStorage.getItem("lang") || "en"
+  );
   const t = STR[lang];
+
+  useEffect(() => {
+    localStorage.setItem("lang", lang);
+  }, [lang]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -740,7 +746,7 @@ function Tracker({ session, lang, setLang, t }) {
             }}
           >
             <span style={{ display: "inline-flex", gap: 8, alignItems: "baseline" }}>
-              <span>
+              <span style={{ color: C.spent }}>
                 {fmt(totalSpent)} {t.spent}
               </span>
               {totalCredit > 0 && (
