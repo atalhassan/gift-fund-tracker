@@ -25,7 +25,7 @@ const SANS = "system-ui, -apple-system, 'Segoe UI', sans-serif";
 const STR = {
   en: {
     dir: "ltr",
-    origin: "Gift from my mother",
+    origin: "Fund Tracker",
     remaining: "Remaining",
     spent: "spent",
     of: "of",
@@ -73,7 +73,7 @@ const STR = {
   },
   ar: {
     dir: "rtl",
-    origin: "هدية من والدتي",
+    origin: "متتبّع الرصيد",
     remaining: "المتبقّي",
     spent: "المصروف",
     of: "من",
