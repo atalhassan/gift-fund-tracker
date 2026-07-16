@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- The ledger card: paper on emerald, gold coin, ink and clay entry lines -->
+  <rect width="512" height="512" rx="112" fill="#0E6B4C"/>
+  <rect x="116" y="146" width="280" height="220" rx="28" fill="#F6F3EC"/>
+  <circle cx="178" cy="208" r="24" fill="#B08A3E"/>
+  <rect x="226" y="196" width="136" height="22" rx="11" fill="#1C2A23" opacity="0.85"/>
+  <rect x="152" y="258" width="208" height="18" rx="9" fill="#71807A" opacity="0.55"/>
+  <rect x="152" y="304" width="150" height="18" rx="9" fill="#A8452F" opacity="0.8"/>
+</svg>

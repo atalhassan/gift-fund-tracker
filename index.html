@@ -6,19 +6,25 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0E6B4C" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <title>Gift Fund</title>
+    <title>Fund Tracker</title>
     <style>
-      * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; background: #F6F3EC; }
-      #root { min-height: 100vh; }
+      /* Pre-hydration only: avoid a bright flash before the stylesheet loads.
+         Deliberately scoped to `html` and to background-color: the real page
+         gradient sits on `body` in index.css, and this rule is unlayered — it
+         would outrank that @layer base rule and blank the gradient out.
+         Keep the colour in step with --color-paper. */
+      html { background-color: #C6BFAE; }
+      body { margin: 0; }
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
