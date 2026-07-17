@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, ChevronDown, Copy, Eye, Link2, Share2, UserMinus, Wallet } from "lucide-react";
+import { ArrowLeft, Check, Copy, Eye, Link2, Share2, UserMinus, Wallet } from "lucide-react";
 import { useAuth } from "../auth";
 import { useFund } from "../hooks/funds";
 import {
@@ -12,7 +12,6 @@ import {
   useShareLinks,
 } from "../hooks/sharing";
 import { useT } from "../i18n";
-import { fmtDate } from "../format";
 import type { FundShareLink, ShareRole } from "../types";
 import { Button, Card, ErrorNote, Spinner } from "../components/ui";
 
@@ -38,16 +37,17 @@ function ShareLinkRow({
   fundName: string;
   highlight?: boolean;
 }) {
-  const { t, lang } = useT();
+  const { t } = useT();
   const revoke = useRevokeShareLink(fundId);
   const [copied, setCopied] = useState(false);
   const [confirmingRevoke, setConfirmingRevoke] = useState(false);
   const rowRef = useRef<HTMLDivElement>(null);
-  const status = linkStatus(link);
   const url = `${window.location.origin}/join/${link.token}`;
+  const isViewer = link.role === "viewer";
+  const RoleIcon = isViewer ? Eye : Wallet;
 
   // Scroll a freshly created link into view so it isn't missed at the
-  // bottom of a long list; the highlight tint fades via the parent.
+  // bottom of the list; the highlight tint fades via the parent.
   useEffect(() => {
     if (highlight) rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [highlight]);
@@ -66,75 +66,57 @@ function ShareLinkRow({
     }
   }
 
-  const badge = {
-    revoked: ["bg-spent/10 text-spent", t.revokedBadge],
-    expired: ["bg-paper text-muted", t.expiredBadge],
-    used_up: ["bg-paper text-muted", t.usedUpBadge],
-    active: null,
-  }[status];
-
   return (
     <div
       ref={rowRef}
+      data-share-url="active"
       className={`rounded-lg px-1 py-3 transition-colors duration-1000 ${
         highlight ? "bg-emerald-soft" : ""
       }`}
     >
-      <div className="flex items-center gap-2" data-share-url={status === "active" ? "active" : status}>
+      <div className="flex items-center gap-2">
         <span
           aria-hidden
-          className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
-            status === "active" ? "bg-emerald-soft text-emerald" : "bg-paper text-muted"
-          }`}
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-soft text-emerald"
         >
-          <Link2 size={18} />
+          <RoleIcon size={18} />
         </span>
         <span
-          className={`min-w-0 flex-1 truncate text-sm font-medium ${
-            status === "active" ? "text-ink" : "text-muted line-through"
+          className={`rounded-full px-2.5 py-0.5 text-sm font-semibold ${
+            isViewer ? "bg-paper text-muted" : "bg-gold/10 text-gold"
           }`}
         >
-          {t.shareLinkItem}
+          {isViewer ? t.linkRoleViewer : t.linkRoleCollab}
         </span>
-        {status === "active" ? (
-          <button
-            onClick={() => setConfirmingRevoke(true)}
-            className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-spent hover:bg-spent/10"
-          >
-            {t.revoke}
-          </button>
-        ) : (
-          badge && (
-            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${badge[0]}`}>
-              {badge[1]}
-            </span>
-          )
-        )}
+        <button
+          onClick={() => setConfirmingRevoke(true)}
+          className="ms-auto shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-spent hover:bg-spent/10"
+        >
+          {t.revoke}
+        </button>
       </div>
-      {status === "active" && (
-        <div className="mt-2 flex gap-2">
-          {canShare && (
-            <button
-              onClick={share}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
-            >
-              <Share2 size={16} aria-hidden />
-              {t.shareLinkBtn}
-            </button>
-          )}
+      <div className="mt-2 flex gap-2">
+        {canShare && (
           <button
-            onClick={copy}
-            className={
-              canShare
-                ? "flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald/40 px-3 py-2.5 text-sm font-semibold text-emerald hover:bg-emerald-soft"
-                : "flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
-            }
+            onClick={share}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
           >
-            {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
-            {copied ? t.linkCopied : t.copyLink}
+            <Share2 size={16} aria-hidden />
+            {t.shareLinkBtn}
           </button>
-        </div>
-      )}
+        )}
+        <button
+          onClick={copy}
+          className={
+            canShare
+              ? "flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald/40 px-3 py-2.5 text-sm font-semibold text-emerald hover:bg-emerald-soft"
+              : "flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
+          }
+        >
+          {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
+          {copied ? t.linkCopied : t.copyLink}
+        </button>
+      </div>
       {confirmingRevoke && (
         <div className="mt-2 flex items-center gap-2">
           <p className="text-xs font-medium text-spent">{t.confirmRevokeLink}</p>
@@ -153,19 +135,7 @@ function ShareLinkRow({
           </button>
         </div>
       )}
-      <div className="mt-1.5 flex items-center gap-2 text-xs text-muted">
-        <span
-          className={`rounded-full px-2 py-0.5 font-medium ${
-            link.role === "viewer" ? "bg-paper text-muted" : "bg-gold/10 text-gold"
-          }`}
-        >
-          {link.role === "viewer" ? t.linkRoleViewer : t.linkRoleCollab}
-        </span>
-        <span>
-          {t.usesLabel(link.use_count, link.max_uses)}
-          {link.expires_at ? ` · ${t.expiresLabel(fmtDate(link.expires_at.slice(0, 10), lang))}` : ""}
-        </span>
-      </div>
+      <p className="mt-1.5 text-xs text-muted">{t.usesLabel(link.use_count, link.max_uses)}</p>
     </div>
   );
 }
@@ -173,16 +143,31 @@ function ShareLinkRow({
 function CreateLinkForm({
   fundId,
   onCreated,
+  collabTaken,
+  viewerTaken,
 }: {
   fundId: string;
   onCreated: (id: string) => void;
+  collabTaken: boolean;
+  viewerTaken: boolean;
 }) {
   const { t } = useT();
   const create = useCreateShareLink(fundId);
   const [role, setRole] = useState<ShareRole>("collaborator");
 
+  const bothTaken = collabTaken && viewerTaken;
+  const isTaken = (r: ShareRole) => (r === "viewer" ? viewerTaken : collabTaken);
+
+  // Only one active link per role. If the selected role already has one
+  // (e.g. right after creating it), move the selection to the free role.
+  useEffect(() => {
+    if (isTaken(role) && !bothTaken) setRole(role === "viewer" ? "collaborator" : "viewer");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collabTaken, viewerTaken]);
+
   function submit(e: FormEvent) {
     e.preventDefault();
+    if (isTaken(role)) return; // guard: never create a second link for a role
     // Expiry/max-uses inputs are hidden for now — links are created
     // non-expiring and unlimited; the schema and hook still support both.
     create.mutate(
@@ -196,7 +181,8 @@ function CreateLinkForm({
       <p className="text-sm font-medium text-ink">{t.linkAccessLabel}</p>
       <div role="radiogroup" aria-label={t.linkAccessLabel} className="grid gap-2">
         {(["collaborator", "viewer"] as const).map((r) => {
-          const selected = role === r;
+          const taken = isTaken(r);
+          const selected = !taken && role === r;
           const Icon = r === "collaborator" ? Wallet : Eye;
           const label = r === "collaborator" ? t.linkRoleCollab : t.linkRoleViewer;
           const desc = r === "collaborator" ? t.linkRoleCollabDesc : t.linkRoleViewerDesc;
@@ -206,11 +192,15 @@ function CreateLinkForm({
               type="button"
               role="radio"
               aria-checked={selected}
-              onClick={() => setRole(r)}
+              aria-disabled={taken}
+              disabled={taken}
+              onClick={() => !taken && setRole(r)}
               className={`flex items-start gap-3 rounded-xl border p-3 text-start transition-colors ${
-                selected
-                  ? "border-emerald bg-emerald-soft"
-                  : "border-line hover:border-emerald/40 hover:bg-paper/60"
+                taken
+                  ? "cursor-not-allowed border-line opacity-60"
+                  : selected
+                    ? "border-emerald bg-emerald-soft"
+                    : "border-line hover:border-emerald/40 hover:bg-paper/60"
               }`}
             >
               <Icon
@@ -224,41 +214,50 @@ function CreateLinkForm({
                 </span>
                 <span className="mt-0.5 block text-xs text-muted">{desc}</span>
               </span>
-              <span
-                aria-hidden
-                className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${
-                  selected ? "border-emerald bg-emerald text-white" : "border-line"
-                }`}
-              >
-                {selected && <Check size={11} strokeWidth={3} />}
-              </span>
+              {taken ? (
+                <span className="mt-0.5 shrink-0 text-xs font-medium text-muted">{t.linkExistsTag}</span>
+              ) : (
+                <span
+                  aria-hidden
+                  className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                    selected ? "border-emerald bg-emerald text-white" : "border-line"
+                  }`}
+                >
+                  {selected && <Check size={11} strokeWidth={3} />}
+                </span>
+              )}
             </button>
           );
         })}
       </div>
       <ErrorNote>{create.error?.message}</ErrorNote>
-      <Button type="submit" disabled={create.isPending} className="w-full">
-        {t.createLink}
-      </Button>
+      {bothTaken ? (
+        <p className="rounded-lg bg-paper px-3 py-2 text-xs text-muted">{t.bothLinksExist}</p>
+      ) : (
+        <Button type="submit" disabled={create.isPending} className="w-full">
+          {t.createLink}
+        </Button>
+      )}
     </form>
   );
 }
 
 function ShareLinksList({
-  links,
+  activeLinks,
   fundId,
   fundName,
   highlightId,
 }: {
-  links: FundShareLink[];
+  activeLinks: FundShareLink[];
   fundId: string;
   fundName: string;
   highlightId: string | null;
 }) {
   const { t } = useT();
-  const [showInactive, setShowInactive] = useState(false);
 
-  if (links.length === 0) {
+  // Revoked/expired links are never shown — the owner only sees links that
+  // still work.
+  if (activeLinks.length === 0) {
     return (
       <div className="mt-4 flex flex-col items-center gap-2 py-4 text-center">
         <Link2 size={24} aria-hidden className="text-muted" />
@@ -267,52 +266,17 @@ function ShareLinksList({
     );
   }
 
-  // Dead links (revoked/expired/used up) are kept for reference but tucked
-  // behind a disclosure so they don't clutter the list of usable links.
-  const active = links.filter((l) => linkStatus(l) === "active");
-  const inactive = links.filter((l) => linkStatus(l) !== "active");
-
   return (
-    <div className="mt-2">
-      {active.length > 0 ? (
-        <div className="divide-y divide-line">
-          {active.map((l) => (
-            <ShareLinkRow
-              key={l.id}
-              link={l}
-              fundId={fundId}
-              fundName={fundName}
-              highlight={l.id === highlightId}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="py-3 text-sm text-muted">{t.noActiveLinks}</p>
-      )}
-      {inactive.length > 0 && (
-        <>
-          <button
-            type="button"
-            onClick={() => setShowInactive((v) => !v)}
-            aria-expanded={showInactive}
-            className="mt-2 flex items-center gap-1 text-xs font-medium text-muted hover:text-ink"
-          >
-            <ChevronDown
-              size={14}
-              aria-hidden
-              className={`transition-transform ${showInactive ? "rotate-180" : ""}`}
-            />
-            {showInactive ? t.hideInactiveLinks : t.showInactiveLinks(inactive.length)}
-          </button>
-          {showInactive && (
-            <div className="divide-y divide-line">
-              {inactive.map((l) => (
-                <ShareLinkRow key={l.id} link={l} fundId={fundId} fundName={fundName} />
-              ))}
-            </div>
-          )}
-        </>
-      )}
+    <div className="mt-2 divide-y divide-line">
+      {activeLinks.map((l) => (
+        <ShareLinkRow
+          key={l.id}
+          link={l}
+          fundId={fundId}
+          fundName={fundName}
+          highlight={l.id === highlightId}
+        />
+      ))}
     </div>
   );
 }
@@ -392,6 +356,7 @@ export default function Members() {
   const { t } = useT();
   const { data: fund, isPending } = useFund(id);
   const { data: links, isPending: linksPending } = useShareLinks(id!);
+  const activeLinks = (links ?? []).filter((l) => linkStatus(l) === "active");
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const highlightTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(highlightTimer.current), []);
@@ -429,12 +394,17 @@ export default function Members() {
       <Card>
         <h2 className="font-semibold">{t.shareLinks}</h2>
         <p className="mb-4 mt-1 text-xs text-muted">{t.linkHint}</p>
-        <CreateLinkForm fundId={fund.id} onCreated={handleCreated} />
+        <CreateLinkForm
+          fundId={fund.id}
+          onCreated={handleCreated}
+          collabTaken={activeLinks.some((l) => l.role === "collaborator")}
+          viewerTaken={activeLinks.some((l) => l.role === "viewer")}
+        />
         {linksPending ? (
           <p className="py-2 text-sm text-muted">{t.loading}</p>
         ) : (
           <ShareLinksList
-            links={links ?? []}
+            activeLinks={activeLinks}
             fundId={fund.id}
             fundName={fund.name}
             highlightId={highlightId}

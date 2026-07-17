@@ -142,18 +142,16 @@ const en = {
   expiryDays: "Expires after (days, optional)",
   maxUses: "Max uses (optional)",
   createLink: "Create link",
+  linkExistsTag: "Already created",
+  bothLinksExist: "You've created both links. Revoke one to create a different one.",
   copy: "Copy",
   copied: "Copied!",
   copyLink: "Copy link",
   linkCopied: "Link copied!",
-  shareLinkItem: "Invitation link",
   shareLinkBtn: "Share link",
   shareInvite: (fund: string) => `Join "${fund}" on Fund Tracker`,
   revoke: "Revoke",
   confirmRevokeLink: "Revoke this link? Anyone holding it will no longer be able to join.",
-  revokedBadge: "Revoked",
-  expiredBadge: "Expired",
-  usedUpBadge: "Used up",
   usesLabel: (n: number, max: number | null) =>
     max
       ? `${n} of ${max} used`
@@ -162,11 +160,7 @@ const en = {
         : n === 1
           ? "1 person joined"
           : `${n} people joined`,
-  expiresLabel: (d: string) => `expires ${d}`,
   noLinks: "No links yet. Create one to invite someone.",
-  noActiveLinks: "No active links.",
-  showInactiveLinks: (n: number) => `Show inactive links (${n})`,
-  hideInactiveLinks: "Hide inactive links",
   members: "Members",
   removeMember: "Remove",
   confirmRemoveMember: "Remove this member? They'll lose access to this fund.",
@@ -314,18 +308,16 @@ const ar: Strings = {
   expiryDays: "تنتهي بعد (أيام، اختياري)",
   maxUses: "أقصى عدد استخدامات (اختياري)",
   createLink: "إنشاء رابط",
+  linkExistsTag: "موجود بالفعل",
+  bothLinksExist: "لقد أنشأت كلا الرابطين. ألغِ أحدهما لإنشاء رابط مختلف.",
   copy: "نسخ",
   copied: "تم النسخ!",
   copyLink: "نسخ الرابط",
   linkCopied: "تم نسخ الرابط!",
-  shareLinkItem: "رابط الدعوة",
   shareLinkBtn: "مشاركة الرابط",
   shareInvite: (fund: string) => `انضم إلى "${fund}" على متتبع الأرصدة`,
   revoke: "إلغاء",
   confirmRevokeLink: "إلغاء هذا الرابط؟ لن يتمكن أي شخص يملكه من الانضمام بعد الآن.",
-  revokedBadge: "ملغي",
-  expiredBadge: "منتهي",
-  usedUpBadge: "مستنفد",
   usesLabel: (n: number, max: number | null) =>
     max
       ? `${n} من ${max} مستخدم`
@@ -336,11 +328,7 @@ const ar: Strings = {
           : n === 2
             ? "انضم شخصان"
             : `انضم ${n} أشخاص`,
-  expiresLabel: (d: string) => `ينتهي ${d}`,
   noLinks: "لا توجد روابط بعد. أنشئ واحداً لدعوة أحدهم.",
-  noActiveLinks: "لا توجد روابط نشطة.",
-  showInactiveLinks: (n: number) => `عرض الروابط غير النشطة (${n})`,
-  hideInactiveLinks: "إخفاء الروابط غير النشطة",
   members: "الأعضاء",
   removeMember: "إزالة",
   confirmRemoveMember: "إزالة هذا العضو؟ سيفقد الوصول إلى هذا الرصيد.",
