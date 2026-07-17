@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, ChevronDown, Copy, Eye, Link2, UserMinus, Wallet } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Copy, Eye, Link2, Share2, UserMinus, Wallet } from "lucide-react";
 import { useAuth } from "../auth";
 import { useFund } from "../hooks/funds";
 import {
@@ -23,13 +23,19 @@ function linkStatus(link: FundShareLink): "active" | "revoked" | "expired" | "us
   return "active";
 }
 
+// The native share sheet ("Share via WhatsApp / Messages…") is the easiest
+// path for non-technical users; it exists on phones but not most desktops.
+const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
 function ShareLinkRow({
   link,
   fundId,
+  fundName,
   highlight = false,
 }: {
   link: FundShareLink;
   fundId: string;
+  fundName: string;
   highlight?: boolean;
 }) {
   const { t, lang } = useT();
@@ -50,6 +56,14 @@ function ShareLinkRow({
     await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function share() {
+    try {
+      await navigator.share({ text: t.shareInvite(fundName), url });
+    } catch {
+      // User dismissed the sheet, or the browser rejected it — nothing to do.
+    }
   }
 
   const badge = {
@@ -83,21 +97,12 @@ function ShareLinkRow({
           {t.shareLinkItem}
         </span>
         {status === "active" ? (
-          <>
-            <button
-              onClick={copy}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-lit"
-            >
-              {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
-              {copied ? t.linkCopied : t.copyLink}
-            </button>
-            <button
-              onClick={() => setConfirmingRevoke(true)}
-              className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-semibold text-spent hover:bg-spent/10"
-            >
-              {t.revoke}
-            </button>
-          </>
+          <button
+            onClick={() => setConfirmingRevoke(true)}
+            className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-spent hover:bg-spent/10"
+          >
+            {t.revoke}
+          </button>
         ) : (
           badge && (
             <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${badge[0]}`}>
@@ -106,6 +111,30 @@ function ShareLinkRow({
           )
         )}
       </div>
+      {status === "active" && (
+        <div className="mt-2 flex gap-2">
+          {canShare && (
+            <button
+              onClick={share}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
+            >
+              <Share2 size={16} aria-hidden />
+              {t.shareLinkBtn}
+            </button>
+          )}
+          <button
+            onClick={copy}
+            className={
+              canShare
+                ? "flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald/40 px-3 py-2.5 text-sm font-semibold text-emerald hover:bg-emerald-soft"
+                : "flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
+            }
+          >
+            {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
+            {copied ? t.linkCopied : t.copyLink}
+          </button>
+        </div>
+      )}
       {confirmingRevoke && (
         <div className="mt-2 flex items-center gap-2">
           <p className="text-xs font-medium text-spent">{t.confirmRevokeLink}</p>
@@ -218,10 +247,12 @@ function CreateLinkForm({
 function ShareLinksList({
   links,
   fundId,
+  fundName,
   highlightId,
 }: {
   links: FundShareLink[];
   fundId: string;
+  fundName: string;
   highlightId: string | null;
 }) {
   const { t } = useT();
@@ -246,7 +277,13 @@ function ShareLinksList({
       {active.length > 0 ? (
         <div className="divide-y divide-line">
           {active.map((l) => (
-            <ShareLinkRow key={l.id} link={l} fundId={fundId} highlight={l.id === highlightId} />
+            <ShareLinkRow
+              key={l.id}
+              link={l}
+              fundId={fundId}
+              fundName={fundName}
+              highlight={l.id === highlightId}
+            />
           ))}
         </div>
       ) : (
@@ -270,7 +307,7 @@ function ShareLinksList({
           {showInactive && (
             <div className="divide-y divide-line">
               {inactive.map((l) => (
-                <ShareLinkRow key={l.id} link={l} fundId={fundId} />
+                <ShareLinkRow key={l.id} link={l} fundId={fundId} fundName={fundName} />
               ))}
             </div>
           )}
@@ -396,7 +433,12 @@ export default function Members() {
         {linksPending ? (
           <p className="py-2 text-sm text-muted">{t.loading}</p>
         ) : (
-          <ShareLinksList links={links ?? []} fundId={fund.id} highlightId={highlightId} />
+          <ShareLinksList
+            links={links ?? []}
+            fundId={fund.id}
+            fundName={fund.name}
+            highlightId={highlightId}
+          />
         )}
       </Card>
 
