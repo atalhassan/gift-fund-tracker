@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../supabase";
 import { useAuth } from "../auth";
-import type { FundShareLink, Role } from "../types";
+import type { FundShareLink, Role, ShareRole } from "../types";
 
 /** localStorage key for a share token seen while signed out; redeemed
  * automatically after the next sign-in (including the return from an
@@ -57,7 +57,8 @@ export function useShareLinks(fundId: string) {
         .eq("fund_id", fundId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      // Generated row types keep role as plain string; narrow to ShareRole.
+      return data as unknown as FundShareLink[];
     },
   });
 }
@@ -66,13 +67,14 @@ export function useCreateShareLink(fundId: string) {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { expiryDays: number | null; maxUses: number | null }) => {
+    mutationFn: async (input: { role: ShareRole; expiryDays: number | null; maxUses: number | null }) => {
       // token comes from the column default (gen_random_bytes in Postgres)
       const { data, error } = await supabase
         .from("fund_share_links")
         .insert({
           fund_id: fundId,
           created_by: user!.id,
+          role: input.role,
           expires_at: input.expiryDays
             ? new Date(Date.now() + input.expiryDays * 86_400_000).toISOString()
             : null,

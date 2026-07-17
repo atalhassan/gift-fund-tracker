@@ -15,6 +15,7 @@ declare
   v_token  text;
   v_token2 text;
   v_token3 text;
+  v_token4 text;
   v_result uuid;
   v_tx_owner uuid;
   v_tx_collab uuid;
@@ -266,6 +267,65 @@ begin
   assert (select count(*) from public.funds) = 0,
     'FAIL: user gained fund access from invalid links';
   raise notice 'ok: no access gained from invalid links';
+
+  ---------------------------------------------------------------------------
+  -- Read-only sharing: a viewer link grants sight but no writes.
+  ---------------------------------------------------------------------------
+  reset role;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_owner, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+
+  insert into public.fund_share_links (fund_id, created_by, role)
+  values (v_fund, v_owner, 'viewer')
+  returning token into v_token4;
+
+  reset role;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_other, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+
+  select public.redeem_share_link(v_token4) into v_result;
+  assert v_result = v_fund, 'FAIL: viewer redeem did not return the fund id';
+  assert (select role from public.fund_members
+          where fund_id = v_fund and user_id = v_other) = 'viewer',
+    'FAIL: viewer link did not create a viewer membership';
+  assert (select count(*) from public.funds where id = v_fund) = 1,
+    'FAIL: viewer cannot see the fund';
+  assert (select count(*) from public.transactions where fund_id = v_fund) > 0,
+    'FAIL: viewer cannot see transactions';
+  assert (select balance from public.fund_balances where fund_id = v_fund) is not null,
+    'FAIL: viewer cannot read the balance view';
+  raise notice 'ok: viewer joined read-only and can see fund, transactions, balance';
+
+  begin
+    insert into public.transactions (fund_id, created_by, type, amount)
+    values (v_fund, v_other, 'expense', 10);
+    raise exception 'FAIL: viewer could insert an expense';
+  exception when insufficient_privilege then
+    raise notice 'ok: viewer cannot insert an expense';
+  end;
+  set local role authenticated;
+
+  begin
+    insert into public.transactions (fund_id, created_by, type, amount)
+    values (v_fund, v_other, 'credit', 10);
+    raise exception 'FAIL: viewer could insert a credit';
+  exception when insufficient_privilege then
+    raise notice 'ok: viewer cannot insert a credit';
+  end;
+  set local role authenticated;
+
+  update public.transactions set amount = 1 where fund_id = v_fund;
+  get diagnostics n = row_count;
+  assert n = 0, 'FAIL: viewer edited a transaction';
+  delete from public.transactions where fund_id = v_fund;
+  get diagnostics n = row_count;
+  assert n = 0, 'FAIL: viewer deleted a transaction';
+  update public.funds set name = 'peeked' where id = v_fund;
+  get diagnostics n = row_count;
+  assert n = 0, 'FAIL: viewer renamed the fund';
+  raise notice 'ok: viewer cannot edit or delete anything';
 
   ---------------------------------------------------------------------------
   -- Anonymous: no table access at all (grants revoked), cannot redeem.

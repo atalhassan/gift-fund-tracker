@@ -13,8 +13,8 @@ import {
 } from "../hooks/sharing";
 import { useT } from "../i18n";
 import { fmtDate } from "../format";
-import type { FundShareLink } from "../types";
-import { Button, Card, ErrorNote, Field, Spinner } from "../components/ui";
+import type { FundShareLink, ShareRole } from "../types";
+import { Button, Card, ErrorNote, Spinner } from "../components/ui";
 
 function linkStatus(link: FundShareLink): "active" | "revoked" | "expired" | "used_up" {
   if (link.revoked) return "revoked";
@@ -82,7 +82,8 @@ function ShareLinkRow({ link, fundId }: { link: FundShareLink; fundId: string })
         )}
       </div>
       <p className="mt-1 text-xs text-muted">
-        {t.usesLabel(link.use_count, link.max_uses)}
+        {link.role === "viewer" ? t.linkRoleViewer : t.linkRoleCollab}
+        {` · ${t.usesLabel(link.use_count, link.max_uses)}`}
         {link.expires_at ? ` · ${t.expiresLabel(fmtDate(link.expires_at.slice(0, 10), lang))}` : ""}
       </p>
     </div>
@@ -92,38 +93,30 @@ function ShareLinkRow({ link, fundId }: { link: FundShareLink; fundId: string })
 function CreateLinkForm({ fundId }: { fundId: string }) {
   const { t } = useT();
   const create = useCreateShareLink(fundId);
-  const [expiryDays, setExpiryDays] = useState("");
-  const [maxUses, setMaxUses] = useState("");
+  const [role, setRole] = useState<ShareRole>("collaborator");
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    create.mutate({
-      expiryDays: expiryDays ? parseInt(expiryDays, 10) : null,
-      maxUses: maxUses ? parseInt(maxUses, 10) : null,
-    });
+    // Expiry/max-uses inputs are hidden for now — links are created
+    // non-expiring and unlimited; the schema and hook still support both.
+    create.mutate({ role, expiryDays: null, maxUses: null });
   }
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <Field
-          label={t.expiryDays}
-          type="number"
-          min="1"
-          step="1"
-          value={expiryDays}
-          onChange={(e) => setExpiryDays(e.target.value)}
-          dir="ltr"
-        />
-        <Field
-          label={t.maxUses}
-          type="number"
-          min="1"
-          step="1"
-          value={maxUses}
-          onChange={(e) => setMaxUses(e.target.value)}
-          dir="ltr"
-        />
+      <div className="flex rounded-xl bg-paper p-1">
+        {(["collaborator", "viewer"] as const).map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => setRole(r)}
+            className={`flex-1 rounded-lg py-1.5 text-sm font-semibold transition-colors ${
+              role === r ? "bg-card text-emerald shadow-sm" : "text-muted"
+            }`}
+          >
+            {r === "collaborator" ? t.linkRoleCollab : t.linkRoleViewer}
+          </button>
+        ))}
       </div>
       <ErrorNote>{create.error?.message}</ErrorNote>
       <Button type="submit" disabled={create.isPending} className="w-full">
@@ -162,10 +155,14 @@ function MembersList({ fundId }: { fundId: string }) {
             <div className="flex shrink-0 items-center gap-2">
               <span
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  m.role === "owner" ? "bg-emerald-soft text-emerald" : "bg-gold/10 text-gold"
+                  m.role === "owner"
+                    ? "bg-emerald-soft text-emerald"
+                    : m.role === "viewer"
+                      ? "bg-paper text-muted"
+                      : "bg-gold/10 text-gold"
                 }`}
               >
-                {m.role === "owner" ? t.ownerBadge : t.collabBadge}
+                {m.role === "owner" ? t.ownerBadge : m.role === "viewer" ? t.viewerBadge : t.collabBadge}
               </span>
               {m.role !== "owner" && (
                 <button

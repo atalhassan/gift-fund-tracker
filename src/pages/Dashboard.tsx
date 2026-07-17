@@ -23,10 +23,14 @@ function FundCard({ fund }: { fund: FundWithBalance }) {
           </div>
           <span
             className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              fund.isOwner ? "bg-emerald-soft text-emerald" : "bg-gold/10 text-gold"
+              fund.isOwner
+                ? "bg-emerald-soft text-emerald"
+                : fund.isViewer
+                  ? "bg-paper text-muted"
+                  : "bg-gold/10 text-gold"
             }`}
           >
-            {fund.isOwner ? t.ownerBadge : t.collabBadge}
+            {fund.isOwner ? t.ownerBadge : fund.isViewer ? t.viewerBadge : t.collabBadge}
           </span>
         </div>
         <p className={`mt-3 font-mono text-2xl font-bold ${balance < 0 ? "text-spent" : "text-emerald"}`}>

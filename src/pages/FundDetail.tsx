@@ -199,7 +199,7 @@ export default function FundDetail() {
                       fund.isOwner ? "bg-emerald-soft text-emerald" : "bg-gold/10 text-gold"
                     }`}
                   >
-                    {fund.isOwner ? t.ownerBadge : t.collabBadge}
+                    {fund.isOwner ? t.ownerBadge : fund.isViewer ? t.viewerBadge : t.collabBadge}
                   </span>
                 </div>
                 {fund.description && <p className="mt-1 text-sm text-muted">{fund.description}</p>}

@@ -358,7 +358,9 @@ export function Transactions({ fund }: { fund: FundWithBalance }) {
 
   return (
     <>
-      <AddTxForm fund={fund} />
+      {/* Viewers are read-only; RLS blocks their writes anyway, so don't
+          offer a form that could only fail. */}
+      {!fund.isViewer && <AddTxForm fund={fund} />}
       <Card>
         <div className="mb-3 space-y-3">
           <h3 className="font-semibold">{t.history}</h3>
@@ -368,7 +370,9 @@ export function Transactions({ fund }: { fund: FundWithBalance }) {
         {q.isPending ? (
           <p className="py-4 text-sm text-muted">{t.loading}</p>
         ) : rows.length === 0 ? (
-          <p className="py-4 text-sm text-muted">{filtered ? t.noTxFiltered : t.noTx}</p>
+          <p className="py-4 text-sm text-muted">
+            {filtered ? t.noTxFiltered : fund.isViewer ? t.noTxViewer : t.noTx}
+          </p>
         ) : (
           <div className="divide-y divide-line">
             {rows.map((tx) => (

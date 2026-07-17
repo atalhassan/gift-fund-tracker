@@ -274,12 +274,14 @@ export type TablesUpdate<Name extends keyof DefaultSchema["Tables"]> =
 // generation (they come back as plain string), so narrow them here.
 // ---------------------------------------------------------------------------
 
-export type Role = "owner" | "collaborator"
+export type Role = "owner" | "collaborator" | "viewer"
+/** Roles a share link can hand out (never 'owner'). */
+export type ShareRole = "collaborator" | "viewer"
 export type TxType = "credit" | "expense"
 
 export type Profile = Tables<"profiles">
 export type Fund = Tables<"funds">
 export type FundMember = Omit<Tables<"fund_members">, "role"> & { role: Role }
-export type FundShareLink = Tables<"fund_share_links">
+export type FundShareLink = Omit<Tables<"fund_share_links">, "role"> & { role: ShareRole }
 export type Transaction = Omit<Tables<"transactions">, "type"> & { type: TxType }
 export type FundBalance = Tables<"fund_balances">
