@@ -66,29 +66,34 @@ function ShareLinkRow({
         highlight ? "bg-emerald-soft" : ""
       }`}
     >
-      <div className="flex items-center gap-2">
-        <input
-          readOnly
-          value={url}
-          dir="ltr"
-          data-share-url={status === "active" ? "active" : status}
-          onFocus={(e) => e.target.select()}
-          className={`min-w-0 flex-1 rounded-lg border border-line bg-paper px-2.5 py-1.5 font-mono text-xs ${
-            status !== "active" ? "text-muted line-through" : ""
+      <div className="flex items-center gap-2" data-share-url={status === "active" ? "active" : status}>
+        <span
+          aria-hidden
+          className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
+            status === "active" ? "bg-emerald-soft text-emerald" : "bg-paper text-muted"
           }`}
-        />
+        >
+          <Link2 size={18} />
+        </span>
+        <span
+          className={`min-w-0 flex-1 truncate text-sm font-medium ${
+            status === "active" ? "text-ink" : "text-muted line-through"
+          }`}
+        >
+          {t.shareLinkItem}
+        </span>
         {status === "active" ? (
           <>
             <button
               onClick={copy}
-              className="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald hover:bg-emerald-soft"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-lit"
             >
               {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
-              {copied ? t.copied : t.copy}
+              {copied ? t.linkCopied : t.copyLink}
             </button>
             <button
               onClick={() => setConfirmingRevoke(true)}
-              className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-spent hover:bg-spent/10"
+              className="shrink-0 rounded-lg px-2.5 py-2 text-xs font-semibold text-spent hover:bg-spent/10"
             >
               {t.revoke}
             </button>
