@@ -132,7 +132,8 @@ const en = {
   membersTitle: "Members & sharing",
   share: "Share",
   shareLinks: "Share links",
-  linkHint: "Anyone who opens a link joins this fund with the access you choose.",
+  linkHint:
+    "Anyone who opens a link joins this fund with the access you choose. Links stay active until you revoke them.",
   linkRoleCollab: "Can spend",
   linkRoleViewer: "View only",
   linkRoleCollabDesc: "They can log expenses and see the balance and all transactions.",
@@ -147,9 +148,19 @@ const en = {
   revokedBadge: "Revoked",
   expiredBadge: "Expired",
   usedUpBadge: "Used up",
-  usesLabel: (n: number, max: number | null) => `${n}${max ? ` / ${max}` : ""} uses`,
+  usesLabel: (n: number, max: number | null) =>
+    max
+      ? `${n} of ${max} used`
+      : n === 0
+        ? "No one has joined yet"
+        : n === 1
+          ? "1 person joined"
+          : `${n} people joined`,
   expiresLabel: (d: string) => `expires ${d}`,
   noLinks: "No links yet. Create one to invite someone.",
+  noActiveLinks: "No active links.",
+  showInactiveLinks: (n: number) => `Show inactive links (${n})`,
+  hideInactiveLinks: "Hide inactive links",
   members: "Members",
   removeMember: "Remove",
   confirmRemoveMember: "Remove this member? They'll lose access to this fund.",
@@ -287,7 +298,8 @@ const ar: Strings = {
   membersTitle: "الأعضاء والمشاركة",
   share: "مشاركة",
   shareLinks: "روابط المشاركة",
-  linkHint: "كل من يفتح الرابط ينضم إلى هذا الرصيد بالصلاحية التي تختارها.",
+  linkHint:
+    "كل من يفتح الرابط ينضم إلى هذا الرصيد بالصلاحية التي تختارها. تبقى الروابط فعّالة حتى تلغيها.",
   linkRoleCollab: "يمكنه الصرف",
   linkRoleViewer: "عرض فقط",
   linkRoleCollabDesc: "يمكنه تسجيل المصروفات والاطلاع على الرصيد وجميع الحركات.",
@@ -302,9 +314,21 @@ const ar: Strings = {
   revokedBadge: "ملغي",
   expiredBadge: "منتهي",
   usedUpBadge: "مستنفد",
-  usesLabel: (n: number, max: number | null) => `${n}${max ? ` / ${max}` : ""} استخدام`,
+  usesLabel: (n: number, max: number | null) =>
+    max
+      ? `${n} من ${max} مستخدم`
+      : n === 0
+        ? "لم ينضم أحد بعد"
+        : n === 1
+          ? "انضم شخص واحد"
+          : n === 2
+            ? "انضم شخصان"
+            : `انضم ${n} أشخاص`,
   expiresLabel: (d: string) => `ينتهي ${d}`,
   noLinks: "لا توجد روابط بعد. أنشئ واحداً لدعوة أحدهم.",
+  noActiveLinks: "لا توجد روابط نشطة.",
+  showInactiveLinks: (n: number) => `عرض الروابط غير النشطة (${n})`,
+  hideInactiveLinks: "إخفاء الروابط غير النشطة",
   members: "الأعضاء",
   removeMember: "إزالة",
   confirmRemoveMember: "إزالة هذا العضو؟ سيفقد الوصول إلى هذا الرصيد.",

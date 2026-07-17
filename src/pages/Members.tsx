@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, Copy, UserMinus } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Copy, UserMinus } from "lucide-react";
 import { useAuth } from "../auth";
 import { useFund } from "../hooks/funds";
 import {
@@ -149,6 +149,56 @@ function CreateLinkForm({ fundId }: { fundId: string }) {
   );
 }
 
+function ShareLinksList({ links, fundId }: { links: FundShareLink[]; fundId: string }) {
+  const { t } = useT();
+  const [showInactive, setShowInactive] = useState(false);
+
+  if (links.length === 0) return <p className="mt-4 text-sm text-muted">{t.noLinks}</p>;
+
+  // Dead links (revoked/expired/used up) are kept for reference but tucked
+  // behind a disclosure so they don't clutter the list of usable links.
+  const active = links.filter((l) => linkStatus(l) === "active");
+  const inactive = links.filter((l) => linkStatus(l) !== "active");
+
+  return (
+    <div className="mt-2">
+      {active.length > 0 ? (
+        <div className="divide-y divide-line">
+          {active.map((l) => (
+            <ShareLinkRow key={l.id} link={l} fundId={fundId} />
+          ))}
+        </div>
+      ) : (
+        <p className="py-3 text-sm text-muted">{t.noActiveLinks}</p>
+      )}
+      {inactive.length > 0 && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowInactive((v) => !v)}
+            aria-expanded={showInactive}
+            className="mt-2 flex items-center gap-1 text-xs font-medium text-muted hover:text-ink"
+          >
+            <ChevronDown
+              size={14}
+              aria-hidden
+              className={`transition-transform ${showInactive ? "rotate-180" : ""}`}
+            />
+            {showInactive ? t.hideInactiveLinks : t.showInactiveLinks(inactive.length)}
+          </button>
+          {showInactive && (
+            <div className="divide-y divide-line">
+              {inactive.map((l) => (
+                <ShareLinkRow key={l.id} link={l} fundId={fundId} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function MembersList({ fundId }: { fundId: string }) {
   const { t } = useT();
   const { user } = useAuth();
@@ -255,14 +305,8 @@ export default function Members() {
         <CreateLinkForm fundId={fund.id} />
         {linksPending ? (
           <p className="py-2 text-sm text-muted">{t.loading}</p>
-        ) : links && links.length > 0 ? (
-          <div className="mt-2 divide-y divide-line">
-            {links.map((l) => (
-              <ShareLinkRow key={l.id} link={l} fundId={fund.id} />
-            ))}
-          </div>
         ) : (
-          <p className="mt-4 text-sm text-muted">{t.noLinks}</p>
+          <ShareLinksList links={links ?? []} fundId={fund.id} />
         )}
       </Card>
 
