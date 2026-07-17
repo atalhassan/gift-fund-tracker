@@ -289,40 +289,41 @@ function TxRowView({ tx, fund }: { tx: TxRow; fund: FundWithBalance }) {
 
   return (
     <div className={`py-3 ${optimistic ? "opacity-60" : ""}`}>
+      {/* Amount alone shares the first line with the description — the
+          edit/delete buttons live on the meta line below, so a long bank
+          message isn't squeezed into a sliver on narrow screens. */}
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="whitespace-pre-line break-words text-sm font-medium">
-            {tx.description || (isCredit ? t.tabCredit : t.tabSpend)}
-          </p>
-          <p className="mt-0.5 text-xs text-muted">
-            {fmtDate(tx.occurred_at, lang)}
-            {tx.author?.display_name ? ` · ${t.byName(tx.author.display_name)}` : ""}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <span className={`font-mono text-sm font-bold ${isCredit ? "text-emerald" : "text-spent"}`}>
-            {isCredit ? "+" : "−"}
-            {fmtMoney(tx.amount, fund.currency, lang)}
-          </span>
-          {canModify && !optimistic && (
-            <>
-              <button
-                onClick={() => setEditing(true)}
-                aria-label={t.edit}
-                className="rounded-lg p-1.5 text-muted hover:bg-emerald-soft hover:text-emerald"
-              >
-                <Pencil size={14} />
-              </button>
-              <button
-                onClick={() => setConfirming(true)}
-                aria-label={t.deleteFund}
-                className="rounded-lg p-1.5 text-muted hover:bg-spent/10 hover:text-spent"
-              >
-                <Trash2 size={14} />
-              </button>
-            </>
-          )}
-        </div>
+        <p className="min-w-0 whitespace-pre-line break-words text-sm font-medium">
+          {tx.description || (isCredit ? t.tabCredit : t.tabSpend)}
+        </p>
+        <span className={`shrink-0 font-mono text-sm font-bold ${isCredit ? "text-emerald" : "text-spent"}`}>
+          {isCredit ? "+" : "−"}
+          {fmtMoney(tx.amount, fund.currency, lang)}
+        </span>
+      </div>
+      <div className="mt-0.5 flex items-center justify-between gap-3">
+        <p className="text-xs text-muted">
+          {fmtDate(tx.occurred_at, lang)}
+          {tx.author?.display_name ? ` · ${t.byName(tx.author.display_name)}` : ""}
+        </p>
+        {canModify && !optimistic && (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => setEditing(true)}
+              aria-label={t.edit}
+              className="rounded-lg p-1.5 text-muted hover:bg-emerald-soft hover:text-emerald"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              onClick={() => setConfirming(true)}
+              aria-label={t.deleteFund}
+              className="rounded-lg p-1.5 text-muted hover:bg-spent/10 hover:text-spent"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        )}
       </div>
       {confirming && (
         <div className="mt-2 flex items-center gap-2">
