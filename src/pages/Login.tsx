@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../supabase";
 import { useAuth } from "../auth";
 import { normalizePhone, displayPhone } from "../phone";
@@ -97,11 +97,12 @@ export default function Login() {
     }
     setBusy(true);
     setError(null);
-    // shouldCreateUser false: signing IN — unknown numbers get an error
-    // instead of a ghost account (and no SMS is sent).
+    // Single phone entry point: shouldCreateUser true means a known number
+    // signs in and a new number gets an account — the user never picks between
+    // "sign in" and "sign up".
     const { error } = await supabase.auth.signInWithOtp({
       phone: p,
-      options: { shouldCreateUser: false },
+      options: { shouldCreateUser: true },
     });
     if (error) setError(authErrorMessage(error, t));
     else setPhone(p);
@@ -227,11 +228,6 @@ export default function Login() {
           )}
         </>
       )}
-      <p className="mt-6 text-center text-sm">
-        <Link to="/signup" className="text-emerald font-medium hover:underline">
-          {t.toSignup}
-        </Link>
-      </p>
     </AuthLayout>
   );
 }
