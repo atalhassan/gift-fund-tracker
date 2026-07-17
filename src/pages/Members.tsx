@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, ChevronDown, Copy, Link2, UserMinus } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Copy, Eye, Link2, UserMinus, Wallet } from "lucide-react";
 import { useAuth } from "../auth";
 import { useFund } from "../hooks/funds";
 import {
@@ -159,25 +159,49 @@ function CreateLinkForm({
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="flex rounded-xl bg-paper p-1" role="tablist">
-        {(["collaborator", "viewer"] as const).map((r) => (
-          <button
-            key={r}
-            type="button"
-            role="tab"
-            aria-selected={role === r}
-            onClick={() => setRole(r)}
-            className={`flex-1 rounded-lg py-1.5 text-sm font-semibold transition-colors ${
-              role === r ? "bg-card text-emerald shadow-sm" : "text-muted"
-            }`}
-          >
-            {r === "collaborator" ? t.linkRoleCollab : t.linkRoleViewer}
-          </button>
-        ))}
+      <p className="text-sm font-medium text-ink">{t.linkAccessLabel}</p>
+      <div role="radiogroup" aria-label={t.linkAccessLabel} className="grid gap-2">
+        {(["collaborator", "viewer"] as const).map((r) => {
+          const selected = role === r;
+          const Icon = r === "collaborator" ? Wallet : Eye;
+          const label = r === "collaborator" ? t.linkRoleCollab : t.linkRoleViewer;
+          const desc = r === "collaborator" ? t.linkRoleCollabDesc : t.linkRoleViewerDesc;
+          return (
+            <button
+              key={r}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => setRole(r)}
+              className={`flex items-start gap-3 rounded-xl border p-3 text-start transition-colors ${
+                selected
+                  ? "border-emerald bg-emerald-soft"
+                  : "border-line hover:border-emerald/40 hover:bg-paper/60"
+              }`}
+            >
+              <Icon
+                size={18}
+                aria-hidden
+                className={`mt-0.5 shrink-0 ${selected ? "text-emerald" : "text-muted"}`}
+              />
+              <span className="min-w-0 flex-1">
+                <span className={`block text-sm font-semibold ${selected ? "text-emerald" : "text-ink"}`}>
+                  {label}
+                </span>
+                <span className="mt-0.5 block text-xs text-muted">{desc}</span>
+              </span>
+              <span
+                aria-hidden
+                className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                  selected ? "border-emerald bg-emerald text-white" : "border-line"
+                }`}
+              >
+                {selected && <Check size={11} strokeWidth={3} />}
+              </span>
+            </button>
+          );
+        })}
       </div>
-      <p className="px-1 text-xs text-muted">
-        {role === "collaborator" ? t.linkRoleCollabDesc : t.linkRoleViewerDesc}
-      </p>
       <ErrorNote>{create.error?.message}</ErrorNote>
       <Button type="submit" disabled={create.isPending} className="w-full">
         {t.createLink}
