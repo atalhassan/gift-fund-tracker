@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, ChevronDown, Copy, UserMinus } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Copy, Link2, UserMinus } from "lucide-react";
 import { useAuth } from "../auth";
 import { useFund } from "../hooks/funds";
 import {
@@ -23,13 +23,28 @@ function linkStatus(link: FundShareLink): "active" | "revoked" | "expired" | "us
   return "active";
 }
 
-function ShareLinkRow({ link, fundId }: { link: FundShareLink; fundId: string }) {
+function ShareLinkRow({
+  link,
+  fundId,
+  highlight = false,
+}: {
+  link: FundShareLink;
+  fundId: string;
+  highlight?: boolean;
+}) {
   const { t, lang } = useT();
   const revoke = useRevokeShareLink(fundId);
   const [copied, setCopied] = useState(false);
   const [confirmingRevoke, setConfirmingRevoke] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
   const status = linkStatus(link);
   const url = `${window.location.origin}/join/${link.token}`;
+
+  // Scroll a freshly created link into view so it isn't missed at the
+  // bottom of a long list; the highlight tint fades via the parent.
+  useEffect(() => {
+    if (highlight) rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [highlight]);
 
   async function copy() {
     await navigator.clipboard.writeText(url);
@@ -45,7 +60,12 @@ function ShareLinkRow({ link, fundId }: { link: FundShareLink; fundId: string })
   }[status];
 
   return (
-    <div className="py-3">
+    <div
+      ref={rowRef}
+      className={`rounded-lg px-1 py-3 transition-colors duration-1000 ${
+        highlight ? "bg-emerald-soft" : ""
+      }`}
+    >
       <div className="flex items-center gap-2">
         <input
           readOnly
@@ -99,16 +119,30 @@ function ShareLinkRow({ link, fundId }: { link: FundShareLink; fundId: string })
           </button>
         </div>
       )}
-      <p className="mt-1 text-xs text-muted">
-        {link.role === "viewer" ? t.linkRoleViewer : t.linkRoleCollab}
-        {` · ${t.usesLabel(link.use_count, link.max_uses)}`}
-        {link.expires_at ? ` · ${t.expiresLabel(fmtDate(link.expires_at.slice(0, 10), lang))}` : ""}
-      </p>
+      <div className="mt-1.5 flex items-center gap-2 text-xs text-muted">
+        <span
+          className={`rounded-full px-2 py-0.5 font-medium ${
+            link.role === "viewer" ? "bg-paper text-muted" : "bg-gold/10 text-gold"
+          }`}
+        >
+          {link.role === "viewer" ? t.linkRoleViewer : t.linkRoleCollab}
+        </span>
+        <span>
+          {t.usesLabel(link.use_count, link.max_uses)}
+          {link.expires_at ? ` · ${t.expiresLabel(fmtDate(link.expires_at.slice(0, 10), lang))}` : ""}
+        </span>
+      </div>
     </div>
   );
 }
 
-function CreateLinkForm({ fundId }: { fundId: string }) {
+function CreateLinkForm({
+  fundId,
+  onCreated,
+}: {
+  fundId: string;
+  onCreated: (id: string) => void;
+}) {
   const { t } = useT();
   const create = useCreateShareLink(fundId);
   const [role, setRole] = useState<ShareRole>("collaborator");
@@ -117,7 +151,10 @@ function CreateLinkForm({ fundId }: { fundId: string }) {
     e.preventDefault();
     // Expiry/max-uses inputs are hidden for now — links are created
     // non-expiring and unlimited; the schema and hook still support both.
-    create.mutate({ role, expiryDays: null, maxUses: null });
+    create.mutate(
+      { role, expiryDays: null, maxUses: null },
+      { onSuccess: (data) => onCreated(data.id) },
+    );
   }
 
   return (
@@ -149,11 +186,26 @@ function CreateLinkForm({ fundId }: { fundId: string }) {
   );
 }
 
-function ShareLinksList({ links, fundId }: { links: FundShareLink[]; fundId: string }) {
+function ShareLinksList({
+  links,
+  fundId,
+  highlightId,
+}: {
+  links: FundShareLink[];
+  fundId: string;
+  highlightId: string | null;
+}) {
   const { t } = useT();
   const [showInactive, setShowInactive] = useState(false);
 
-  if (links.length === 0) return <p className="mt-4 text-sm text-muted">{t.noLinks}</p>;
+  if (links.length === 0) {
+    return (
+      <div className="mt-4 flex flex-col items-center gap-2 py-4 text-center">
+        <Link2 size={24} aria-hidden className="text-muted" />
+        <p className="text-sm text-muted">{t.noLinks}</p>
+      </div>
+    );
+  }
 
   // Dead links (revoked/expired/used up) are kept for reference but tucked
   // behind a disclosure so they don't clutter the list of usable links.
@@ -165,7 +217,7 @@ function ShareLinksList({ links, fundId }: { links: FundShareLink[]; fundId: str
       {active.length > 0 ? (
         <div className="divide-y divide-line">
           {active.map((l) => (
-            <ShareLinkRow key={l.id} link={l} fundId={fundId} />
+            <ShareLinkRow key={l.id} link={l} fundId={fundId} highlight={l.id === highlightId} />
           ))}
         </div>
       ) : (
@@ -274,6 +326,15 @@ export default function Members() {
   const { t } = useT();
   const { data: fund, isPending } = useFund(id);
   const { data: links, isPending: linksPending } = useShareLinks(id!);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(highlightTimer.current), []);
+
+  function handleCreated(linkId: string) {
+    setHighlightId(linkId);
+    clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => setHighlightId(null), 2800);
+  }
 
   if (isPending) return <Spinner label={t.loading} />;
   if (!fund) {
@@ -302,11 +363,11 @@ export default function Members() {
       <Card>
         <h2 className="font-semibold">{t.shareLinks}</h2>
         <p className="mb-4 mt-1 text-xs text-muted">{t.linkHint}</p>
-        <CreateLinkForm fundId={fund.id} />
+        <CreateLinkForm fundId={fund.id} onCreated={handleCreated} />
         {linksPending ? (
           <p className="py-2 text-sm text-muted">{t.loading}</p>
         ) : (
-          <ShareLinksList links={links ?? []} fundId={fund.id} />
+          <ShareLinksList links={links ?? []} fundId={fund.id} highlightId={highlightId} />
         )}
       </Card>
 
