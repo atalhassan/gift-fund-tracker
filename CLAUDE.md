@@ -19,9 +19,11 @@ notices) — run it in the Supabase SQL Editor or through an MCP `execute_sql` c
 
 Requires `.env` (copy `.env.example`) with `VITE_SUPABASE_URL` and
 `VITE_SUPABASE_ANON_KEY`. `.env.staging` (gitignored) points `dev:staging` at the
-staging project. The Supabase MCP server in `.mcp.json` is connected to the
-**staging** project — safe for experiments; migrations must still be committed to
-`supabase/migrations/` so production gets identical SQL.
+staging project. `.mcp.json` has two Supabase MCP servers: `supabase` is the
+**staging** project — safe for experiments — and `supabase_prod` is **production**:
+real user data, touch only to apply already-verified migrations or to inspect.
+Develop and verify against staging first; migrations must be committed to
+`supabase/migrations/` and applied to both projects so they run identical SQL.
 
 ## Architecture
 
