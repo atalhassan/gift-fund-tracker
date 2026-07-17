@@ -1,7 +1,6 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, Copy, UserMinus } from "lucide-react";
+import { ArrowLeft, Check, Copy, Eye, Plus, Share2, UserMinus, Wallet } from "lucide-react";
 import { useAuth } from "../auth";
 import { useFund } from "../hooks/funds";
 import {
@@ -12,9 +11,8 @@ import {
   useShareLinks,
 } from "../hooks/sharing";
 import { useT } from "../i18n";
-import { fmtDate } from "../format";
 import type { FundShareLink, ShareRole } from "../types";
-import { Button, Card, ErrorNote, Spinner } from "../components/ui";
+import { Card, ErrorNote, Spinner } from "../components/ui";
 
 function linkStatus(link: FundShareLink): "active" | "revoked" | "expired" | "used_up" {
   if (link.revoked) return "revoked";
@@ -23,12 +21,46 @@ function linkStatus(link: FundShareLink): "active" | "revoked" | "expired" | "us
   return "active";
 }
 
-function ShareLinkRow({ link, fundId }: { link: FundShareLink; fundId: string }) {
-  const { t, lang } = useT();
+// The native share sheet ("Share via WhatsApp / Messages…") is the easiest
+// path for non-technical users; it exists on phones but not most desktops.
+const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+// One card per role. The set of roles is fixed (Can spend / View only) and a
+// fund holds at most one active link per role, so each card either shows the
+// existing link's actions or an inline "Create link" — no separate form/list.
+function RoleCard({
+  role,
+  fundId,
+  fundName,
+  link,
+  highlight,
+  onCreated,
+}: {
+  role: ShareRole;
+  fundId: string;
+  fundName: string;
+  link?: FundShareLink;
+  highlight: boolean;
+  onCreated: (id: string) => void;
+}) {
+  const { t } = useT();
+  const create = useCreateShareLink(fundId);
   const revoke = useRevokeShareLink(fundId);
   const [copied, setCopied] = useState(false);
-  const status = linkStatus(link);
-  const url = `${window.location.origin}/join/${link.token}`;
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const isViewer = role === "viewer";
+  const RoleIcon = isViewer ? Eye : Wallet;
+  const label = isViewer ? t.linkRoleViewer : t.linkRoleCollab;
+  const desc = isViewer ? t.linkRoleViewerDesc : t.linkRoleCollabDesc;
+  const url = link ? `${window.location.origin}/join/${link.token}` : "";
+
+  // Scroll a freshly created link into view; the highlight tint fades via the
+  // parent clearing highlightId after a moment.
+  useEffect(() => {
+    if (highlight) cardRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [highlight]);
 
   async function copy() {
     await navigator.clipboard.writeText(url);
@@ -36,93 +68,111 @@ function ShareLinkRow({ link, fundId }: { link: FundShareLink; fundId: string })
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const badge = {
-    revoked: ["bg-spent/10 text-spent", t.revokedBadge],
-    expired: ["bg-paper text-muted", t.expiredBadge],
-    used_up: ["bg-paper text-muted", t.usedUpBadge],
-    active: null,
-  }[status];
+  async function share() {
+    try {
+      await navigator.share({ text: t.shareInvite(fundName), url });
+    } catch {
+      // User dismissed the sheet, or the browser rejected it — nothing to do.
+    }
+  }
 
-  return (
-    <div className="py-3">
-      <div className="flex items-center gap-2">
-        <input
-          readOnly
-          value={url}
-          dir="ltr"
-          data-share-url={status === "active" ? "active" : status}
-          onFocus={(e) => e.target.select()}
-          className={`min-w-0 flex-1 rounded-lg border border-line bg-paper px-2.5 py-1.5 font-mono text-xs ${
-            status !== "active" ? "text-muted line-through" : ""
-          }`}
-        />
-        {status === "active" ? (
-          <>
-            <button
-              onClick={copy}
-              className="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald hover:bg-emerald-soft"
-            >
-              {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
-              {copied ? t.copied : t.copy}
-            </button>
-            <button
-              onClick={() => revoke.mutate(link.id)}
-              disabled={revoke.isPending}
-              className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-spent hover:bg-spent/10 disabled:opacity-50"
-            >
-              {t.revoke}
-            </button>
-          </>
-        ) : (
-          badge && (
-            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${badge[0]}`}>
-              {badge[1]}
-            </span>
-          )
-        )}
-      </div>
-      <p className="mt-1 text-xs text-muted">
-        {link.role === "viewer" ? t.linkRoleViewer : t.linkRoleCollab}
-        {` · ${t.usesLabel(link.use_count, link.max_uses)}`}
-        {link.expires_at ? ` · ${t.expiresLabel(fmtDate(link.expires_at.slice(0, 10), lang))}` : ""}
-      </p>
-    </div>
-  );
-}
-
-function CreateLinkForm({ fundId }: { fundId: string }) {
-  const { t } = useT();
-  const create = useCreateShareLink(fundId);
-  const [role, setRole] = useState<ShareRole>("collaborator");
-
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    // Expiry/max-uses inputs are hidden for now — links are created
-    // non-expiring and unlimited; the schema and hook still support both.
-    create.mutate({ role, expiryDays: null, maxUses: null });
+  function createLink() {
+    // Expiry/max-uses are unused for now — links are created non-expiring and
+    // unlimited; the schema and hook still support both.
+    create.mutate(
+      { role, expiryDays: null, maxUses: null },
+      { onSuccess: (data) => onCreated(data.id) },
+    );
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3">
-      <div className="flex rounded-xl bg-paper p-1">
-        {(["collaborator", "viewer"] as const).map((r) => (
+    <div
+      ref={cardRef}
+      data-role-card={role}
+      data-share-url={link ? "active" : "none"}
+      className={`rounded-xl border p-3 transition-colors duration-1000 ${
+        highlight ? "border-emerald bg-emerald-soft" : "border-line"
+      }`}
+    >
+      <div className="flex items-start gap-2.5">
+        <span
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-soft text-emerald"
+        >
+          <RoleIcon size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-ink">{label}</span>
+          <span className="mt-0.5 block text-xs text-muted">{desc}</span>
+        </div>
+        {link && (
           <button
-            key={r}
-            type="button"
-            onClick={() => setRole(r)}
-            className={`flex-1 rounded-lg py-1.5 text-sm font-semibold transition-colors ${
-              role === r ? "bg-card text-emerald shadow-sm" : "text-muted"
-            }`}
+            onClick={() => setConfirmingRevoke(true)}
+            className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-spent hover:bg-spent/10"
           >
-            {r === "collaborator" ? t.linkRoleCollab : t.linkRoleViewer}
+            {t.revoke}
           </button>
-        ))}
+        )}
       </div>
-      <ErrorNote>{create.error?.message}</ErrorNote>
-      <Button type="submit" disabled={create.isPending} className="w-full">
-        {t.createLink}
-      </Button>
-    </form>
+
+      {link ? (
+        <>
+          <div className="mt-3 flex gap-2">
+            {canShare && (
+              <button
+                onClick={share}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
+              >
+                <Share2 size={16} aria-hidden />
+                {t.shareLinkBtn}
+              </button>
+            )}
+            <button
+              onClick={copy}
+              className={
+                canShare
+                  ? "flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald/40 px-3 py-2.5 text-sm font-semibold text-emerald hover:bg-emerald-soft"
+                  : "flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
+              }
+            >
+              {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
+              {copied ? t.linkCopied : t.copyLink}
+            </button>
+          </div>
+          {confirmingRevoke && (
+            <div className="mt-2 flex items-center gap-2">
+              <p className="text-xs font-medium text-spent">{t.confirmRevokeLink}</p>
+              <button
+                onClick={() => revoke.mutate(link.id, { onSuccess: () => setConfirmingRevoke(false) })}
+                disabled={revoke.isPending}
+                className="shrink-0 rounded-lg bg-spent px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {t.confirmYes}
+              </button>
+              <button
+                onClick={() => setConfirmingRevoke(false)}
+                className="shrink-0 text-xs text-muted hover:text-ink"
+              >
+                {t.cancel}
+              </button>
+            </div>
+          )}
+          <p className="mt-1.5 text-xs text-muted">{t.usesLabel(link.use_count, link.max_uses)}</p>
+        </>
+      ) : (
+        <>
+          <ErrorNote>{create.error?.message}</ErrorNote>
+          <button
+            onClick={createLink}
+            disabled={create.isPending}
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit disabled:opacity-50"
+          >
+            <Plus size={16} aria-hidden />
+            {t.createLink}
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -201,6 +251,16 @@ export default function Members() {
   const { t } = useT();
   const { data: fund, isPending } = useFund(id);
   const { data: links, isPending: linksPending } = useShareLinks(id!);
+  const activeLinks = (links ?? []).filter((l) => linkStatus(l) === "active");
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(highlightTimer.current), []);
+
+  function handleCreated(linkId: string) {
+    setHighlightId(linkId);
+    clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => setHighlightId(null), 2800);
+  }
 
   if (isPending) return <Spinner label={t.loading} />;
   if (!fund) {
@@ -229,17 +289,25 @@ export default function Members() {
       <Card>
         <h2 className="font-semibold">{t.shareLinks}</h2>
         <p className="mb-4 mt-1 text-xs text-muted">{t.linkHint}</p>
-        <CreateLinkForm fundId={fund.id} />
         {linksPending ? (
           <p className="py-2 text-sm text-muted">{t.loading}</p>
-        ) : links && links.length > 0 ? (
-          <div className="mt-2 divide-y divide-line">
-            {links.map((l) => (
-              <ShareLinkRow key={l.id} link={l} fundId={fund.id} />
-            ))}
-          </div>
         ) : (
-          <p className="mt-4 text-sm text-muted">{t.noLinks}</p>
+          <div className="space-y-3">
+            {(["collaborator", "viewer"] as const).map((role) => {
+              const link = activeLinks.find((l) => l.role === role);
+              return (
+                <RoleCard
+                  key={role}
+                  role={role}
+                  fundId={fund.id}
+                  fundName={fund.name}
+                  link={link}
+                  highlight={!!link && link.id === highlightId}
+                  onCreated={handleCreated}
+                />
+              );
+            })}
+          </div>
         )}
       </Card>
 

@@ -40,7 +40,7 @@ const en = {
   emailTab: "Email",
   phoneTab: "Phone",
   phoneLabel: "Phone number",
-  phonePlaceholder: "05xxxxxxxx or +9665xxxxxxxx",
+  phonePlaceholder: "05xxxxxxxx",
   sendCode: "Send code",
   codeLabel: "Verification code",
   codeSent: "We sent you a code by SMS.",
@@ -80,7 +80,7 @@ const en = {
   noFundsBody: "Create your first fund, or open a share link someone sent you.",
   createFirst: "Create a fund",
   ownerBadge: "Owner",
-  collabBadge: "Shared",
+  collabBadge: "Can spend",
   viewerBadge: "View only",
   noActivity: "No activity yet",
   errorLoading: "Couldn't load your data.",
@@ -132,21 +132,30 @@ const en = {
   membersTitle: "Members & sharing",
   share: "Share",
   shareLinks: "Share links",
-  linkHint: "Anyone who opens a link joins this fund with the access you choose.",
+  linkHint: "Share a link so others can help. Each link stays active until you revoke it.",
   linkRoleCollab: "Can spend",
   linkRoleViewer: "View only",
+  linkRoleCollabDesc: "They can log expenses and see the balance and all transactions.",
+  linkRoleViewerDesc: "They can see the balance and transactions, but can't make any changes.",
   expiryDays: "Expires after (days, optional)",
   maxUses: "Max uses (optional)",
   createLink: "Create link",
   copy: "Copy",
   copied: "Copied!",
+  copyLink: "Copy link",
+  linkCopied: "Link copied!",
+  shareLinkBtn: "Share link",
+  shareInvite: (fund: string) => `Join "${fund}" on Fund Tracker`,
   revoke: "Revoke",
-  revokedBadge: "Revoked",
-  expiredBadge: "Expired",
-  usedUpBadge: "Used up",
-  usesLabel: (n: number, max: number | null) => `${n}${max ? ` / ${max}` : ""} uses`,
-  expiresLabel: (d: string) => `expires ${d}`,
-  noLinks: "No links yet. Create one to invite someone.",
+  confirmRevokeLink: "Revoke this link? Anyone holding it will no longer be able to join.",
+  usesLabel: (n: number, max: number | null) =>
+    max
+      ? `${n} of ${max} used`
+      : n === 0
+        ? "No one has joined yet"
+        : n === 1
+          ? "1 person joined"
+          : `${n} people joined`,
   members: "Members",
   removeMember: "Remove",
   confirmRemoveMember: "Remove this member? They'll lose access to this fund.",
@@ -200,7 +209,7 @@ const ar: Strings = {
   emailTab: "البريد",
   phoneTab: "الجوال",
   phoneLabel: "رقم الجوال",
-  phonePlaceholder: "05xxxxxxxx أو +9665xxxxxxxx",
+  phonePlaceholder: "05xxxxxxxx",
   sendCode: "إرسال الرمز",
   codeLabel: "رمز التحقق",
   codeSent: "أرسلنا لك رمزاً عبر رسالة نصية.",
@@ -236,7 +245,7 @@ const ar: Strings = {
   noFundsBody: "أنشئ أول رصيد لك، أو افتح رابط مشاركة أرسله لك أحدهم.",
   createFirst: "إنشاء رصيد",
   ownerBadge: "مالك",
-  collabBadge: "مشترك",
+  collabBadge: "يمكنه الصرف",
   viewerBadge: "عرض فقط",
   noActivity: "لا نشاط بعد",
   errorLoading: "تعذّر تحميل بياناتك.",
@@ -284,21 +293,32 @@ const ar: Strings = {
   membersTitle: "الأعضاء والمشاركة",
   share: "مشاركة",
   shareLinks: "روابط المشاركة",
-  linkHint: "كل من يفتح الرابط ينضم إلى هذا الرصيد بالصلاحية التي تختارها.",
+  linkHint: "شارك رابطاً ليساعدك الآخرون. يبقى كل رابط فعّالاً حتى تلغيه.",
   linkRoleCollab: "يمكنه الصرف",
   linkRoleViewer: "عرض فقط",
+  linkRoleCollabDesc: "يمكنه تسجيل المصروفات والاطلاع على الرصيد وجميع الحركات.",
+  linkRoleViewerDesc: "يمكنه الاطلاع على الرصيد والحركات فقط، دون إجراء أي تغيير.",
   expiryDays: "تنتهي بعد (أيام، اختياري)",
   maxUses: "أقصى عدد استخدامات (اختياري)",
   createLink: "إنشاء رابط",
   copy: "نسخ",
   copied: "تم النسخ!",
+  copyLink: "نسخ الرابط",
+  linkCopied: "تم نسخ الرابط!",
+  shareLinkBtn: "مشاركة الرابط",
+  shareInvite: (fund: string) => `انضم إلى "${fund}" على متتبع الأرصدة`,
   revoke: "إلغاء",
-  revokedBadge: "ملغي",
-  expiredBadge: "منتهي",
-  usedUpBadge: "مستنفد",
-  usesLabel: (n: number, max: number | null) => `${n}${max ? ` / ${max}` : ""} استخدام`,
-  expiresLabel: (d: string) => `ينتهي ${d}`,
-  noLinks: "لا توجد روابط بعد. أنشئ واحداً لدعوة أحدهم.",
+  confirmRevokeLink: "إلغاء هذا الرابط؟ لن يتمكن أي شخص يملكه من الانضمام بعد الآن.",
+  usesLabel: (n: number, max: number | null) =>
+    max
+      ? `${n} من ${max} مستخدم`
+      : n === 0
+        ? "لم ينضم أحد بعد"
+        : n === 1
+          ? "انضم شخص واحد"
+          : n === 2
+            ? "انضم شخصان"
+            : `انضم ${n} أشخاص`,
   members: "الأعضاء",
   removeMember: "إزالة",
   confirmRemoveMember: "إزالة هذا العضو؟ سيفقد الوصول إلى هذا الرصيد.",
