@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, Copy, Eye, Link2, Share2, UserMinus, Wallet } from "lucide-react";
+import { ArrowLeft, Check, Copy, Eye, Plus, Share2, UserMinus, Wallet } from "lucide-react";
 import { useAuth } from "../auth";
 import { useFund } from "../hooks/funds";
 import {
@@ -13,7 +12,7 @@ import {
 } from "../hooks/sharing";
 import { useT } from "../i18n";
 import type { FundShareLink, ShareRole } from "../types";
-import { Button, Card, ErrorNote, Spinner } from "../components/ui";
+import { Card, ErrorNote, Spinner } from "../components/ui";
 
 function linkStatus(link: FundShareLink): "active" | "revoked" | "expired" | "used_up" {
   if (link.revoked) return "revoked";
@@ -26,30 +25,41 @@ function linkStatus(link: FundShareLink): "active" | "revoked" | "expired" | "us
 // path for non-technical users; it exists on phones but not most desktops.
 const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
-function ShareLinkRow({
-  link,
+// One card per role. The set of roles is fixed (Can spend / View only) and a
+// fund holds at most one active link per role, so each card either shows the
+// existing link's actions or an inline "Create link" — no separate form/list.
+function RoleCard({
+  role,
   fundId,
   fundName,
-  highlight = false,
+  link,
+  highlight,
+  onCreated,
 }: {
-  link: FundShareLink;
+  role: ShareRole;
   fundId: string;
   fundName: string;
-  highlight?: boolean;
+  link?: FundShareLink;
+  highlight: boolean;
+  onCreated: (id: string) => void;
 }) {
   const { t } = useT();
+  const create = useCreateShareLink(fundId);
   const revoke = useRevokeShareLink(fundId);
   const [copied, setCopied] = useState(false);
   const [confirmingRevoke, setConfirmingRevoke] = useState(false);
-  const rowRef = useRef<HTMLDivElement>(null);
-  const url = `${window.location.origin}/join/${link.token}`;
-  const isViewer = link.role === "viewer";
-  const RoleIcon = isViewer ? Eye : Wallet;
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  // Scroll a freshly created link into view so it isn't missed at the
-  // bottom of the list; the highlight tint fades via the parent.
+  const isViewer = role === "viewer";
+  const RoleIcon = isViewer ? Eye : Wallet;
+  const label = isViewer ? t.linkRoleViewer : t.linkRoleCollab;
+  const desc = isViewer ? t.linkRoleViewerDesc : t.linkRoleCollabDesc;
+  const url = link ? `${window.location.origin}/join/${link.token}` : "";
+
+  // Scroll a freshly created link into view; the highlight tint fades via the
+  // parent clearing highlightId after a moment.
   useEffect(() => {
-    if (highlight) rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (highlight) cardRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [highlight]);
 
   async function copy() {
@@ -66,110 +76,9 @@ function ShareLinkRow({
     }
   }
 
-  return (
-    <div
-      ref={rowRef}
-      data-share-url="active"
-      className={`rounded-lg px-1 py-3 transition-colors duration-1000 ${
-        highlight ? "bg-emerald-soft" : ""
-      }`}
-    >
-      <div className="flex items-center gap-2">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-soft text-emerald"
-        >
-          <RoleIcon size={18} />
-        </span>
-        <span
-          className={`rounded-full px-2.5 py-0.5 text-sm font-semibold ${
-            isViewer ? "bg-paper text-muted" : "bg-gold/10 text-gold"
-          }`}
-        >
-          {isViewer ? t.linkRoleViewer : t.linkRoleCollab}
-        </span>
-        <button
-          onClick={() => setConfirmingRevoke(true)}
-          className="ms-auto shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-spent hover:bg-spent/10"
-        >
-          {t.revoke}
-        </button>
-      </div>
-      <div className="mt-2 flex gap-2">
-        {canShare && (
-          <button
-            onClick={share}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
-          >
-            <Share2 size={16} aria-hidden />
-            {t.shareLinkBtn}
-          </button>
-        )}
-        <button
-          onClick={copy}
-          className={
-            canShare
-              ? "flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald/40 px-3 py-2.5 text-sm font-semibold text-emerald hover:bg-emerald-soft"
-              : "flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
-          }
-        >
-          {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
-          {copied ? t.linkCopied : t.copyLink}
-        </button>
-      </div>
-      {confirmingRevoke && (
-        <div className="mt-2 flex items-center gap-2">
-          <p className="text-xs font-medium text-spent">{t.confirmRevokeLink}</p>
-          <button
-            onClick={() => revoke.mutate(link.id, { onSuccess: () => setConfirmingRevoke(false) })}
-            disabled={revoke.isPending}
-            className="shrink-0 rounded-lg bg-spent px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50"
-          >
-            {t.confirmYes}
-          </button>
-          <button
-            onClick={() => setConfirmingRevoke(false)}
-            className="shrink-0 text-xs text-muted hover:text-ink"
-          >
-            {t.cancel}
-          </button>
-        </div>
-      )}
-      <p className="mt-1.5 text-xs text-muted">{t.usesLabel(link.use_count, link.max_uses)}</p>
-    </div>
-  );
-}
-
-function CreateLinkForm({
-  fundId,
-  onCreated,
-  collabTaken,
-  viewerTaken,
-}: {
-  fundId: string;
-  onCreated: (id: string) => void;
-  collabTaken: boolean;
-  viewerTaken: boolean;
-}) {
-  const { t } = useT();
-  const create = useCreateShareLink(fundId);
-  const [role, setRole] = useState<ShareRole>("collaborator");
-
-  const bothTaken = collabTaken && viewerTaken;
-  const isTaken = (r: ShareRole) => (r === "viewer" ? viewerTaken : collabTaken);
-
-  // Only one active link per role. If the selected role already has one
-  // (e.g. right after creating it), move the selection to the free role.
-  useEffect(() => {
-    if (isTaken(role) && !bothTaken) setRole(role === "viewer" ? "collaborator" : "viewer");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collabTaken, viewerTaken]);
-
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    if (isTaken(role)) return; // guard: never create a second link for a role
-    // Expiry/max-uses inputs are hidden for now — links are created
-    // non-expiring and unlimited; the schema and hook still support both.
+  function createLink() {
+    // Expiry/max-uses are unused for now — links are created non-expiring and
+    // unlimited; the schema and hook still support both.
     create.mutate(
       { role, expiryDays: null, maxUses: null },
       { onSuccess: (data) => onCreated(data.id) },
@@ -177,106 +86,92 @@ function CreateLinkForm({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3">
-      <p className="text-sm font-medium text-ink">{t.linkAccessLabel}</p>
-      <div role="radiogroup" aria-label={t.linkAccessLabel} className="grid gap-2">
-        {(["collaborator", "viewer"] as const).map((r) => {
-          const taken = isTaken(r);
-          const selected = !taken && role === r;
-          const Icon = r === "collaborator" ? Wallet : Eye;
-          const label = r === "collaborator" ? t.linkRoleCollab : t.linkRoleViewer;
-          const desc = r === "collaborator" ? t.linkRoleCollabDesc : t.linkRoleViewerDesc;
-          return (
+    <div
+      ref={cardRef}
+      data-role-card={role}
+      data-share-url={link ? "active" : "none"}
+      className={`rounded-xl border p-3 transition-colors duration-1000 ${
+        highlight ? "border-emerald bg-emerald-soft" : "border-line"
+      }`}
+    >
+      <div className="flex items-start gap-2.5">
+        <span
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-soft text-emerald"
+        >
+          <RoleIcon size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-ink">{label}</span>
+          <span className="mt-0.5 block text-xs text-muted">{desc}</span>
+        </div>
+        {link && (
+          <button
+            onClick={() => setConfirmingRevoke(true)}
+            className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-spent hover:bg-spent/10"
+          >
+            {t.revoke}
+          </button>
+        )}
+      </div>
+
+      {link ? (
+        <>
+          <div className="mt-3 flex gap-2">
+            {canShare && (
+              <button
+                onClick={share}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
+              >
+                <Share2 size={16} aria-hidden />
+                {t.shareLinkBtn}
+              </button>
+            )}
             <button
-              key={r}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              aria-disabled={taken}
-              disabled={taken}
-              onClick={() => !taken && setRole(r)}
-              className={`flex items-start gap-3 rounded-xl border p-3 text-start transition-colors ${
-                taken
-                  ? "cursor-not-allowed border-line opacity-60"
-                  : selected
-                    ? "border-emerald bg-emerald-soft"
-                    : "border-line hover:border-emerald/40 hover:bg-paper/60"
-              }`}
+              onClick={copy}
+              className={
+                canShare
+                  ? "flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald/40 px-3 py-2.5 text-sm font-semibold text-emerald hover:bg-emerald-soft"
+                  : "flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit"
+              }
             >
-              <Icon
-                size={18}
-                aria-hidden
-                className={`mt-0.5 shrink-0 ${selected ? "text-emerald" : "text-muted"}`}
-              />
-              <span className="min-w-0 flex-1">
-                <span className={`block text-sm font-semibold ${selected ? "text-emerald" : "text-ink"}`}>
-                  {label}
-                </span>
-                <span className="mt-0.5 block text-xs text-muted">{desc}</span>
-              </span>
-              {taken ? (
-                <span className="mt-0.5 shrink-0 text-xs font-medium text-muted">{t.linkExistsTag}</span>
-              ) : (
-                <span
-                  aria-hidden
-                  className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${
-                    selected ? "border-emerald bg-emerald text-white" : "border-line"
-                  }`}
-                >
-                  {selected && <Check size={11} strokeWidth={3} />}
-                </span>
-              )}
+              {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
+              {copied ? t.linkCopied : t.copyLink}
             </button>
-          );
-        })}
-      </div>
-      <ErrorNote>{create.error?.message}</ErrorNote>
-      {bothTaken ? (
-        <p className="rounded-lg bg-paper px-3 py-2 text-xs text-muted">{t.bothLinksExist}</p>
+          </div>
+          {confirmingRevoke && (
+            <div className="mt-2 flex items-center gap-2">
+              <p className="text-xs font-medium text-spent">{t.confirmRevokeLink}</p>
+              <button
+                onClick={() => revoke.mutate(link.id, { onSuccess: () => setConfirmingRevoke(false) })}
+                disabled={revoke.isPending}
+                className="shrink-0 rounded-lg bg-spent px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {t.confirmYes}
+              </button>
+              <button
+                onClick={() => setConfirmingRevoke(false)}
+                className="shrink-0 text-xs text-muted hover:text-ink"
+              >
+                {t.cancel}
+              </button>
+            </div>
+          )}
+          <p className="mt-1.5 text-xs text-muted">{t.usesLabel(link.use_count, link.max_uses)}</p>
+        </>
       ) : (
-        <Button type="submit" disabled={create.isPending} className="w-full">
-          {t.createLink}
-        </Button>
+        <>
+          <ErrorNote>{create.error?.message}</ErrorNote>
+          <button
+            onClick={createLink}
+            disabled={create.isPending}
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-lit disabled:opacity-50"
+          >
+            <Plus size={16} aria-hidden />
+            {t.createLink}
+          </button>
+        </>
       )}
-    </form>
-  );
-}
-
-function ShareLinksList({
-  activeLinks,
-  fundId,
-  fundName,
-  highlightId,
-}: {
-  activeLinks: FundShareLink[];
-  fundId: string;
-  fundName: string;
-  highlightId: string | null;
-}) {
-  const { t } = useT();
-
-  // Revoked/expired links are never shown — the owner only sees links that
-  // still work.
-  if (activeLinks.length === 0) {
-    return (
-      <div className="mt-4 flex flex-col items-center gap-2 py-4 text-center">
-        <Link2 size={24} aria-hidden className="text-muted" />
-        <p className="text-sm text-muted">{t.noLinks}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-2 divide-y divide-line">
-      {activeLinks.map((l) => (
-        <ShareLinkRow
-          key={l.id}
-          link={l}
-          fundId={fundId}
-          fundName={fundName}
-          highlight={l.id === highlightId}
-        />
-      ))}
     </div>
   );
 }
@@ -394,21 +289,25 @@ export default function Members() {
       <Card>
         <h2 className="font-semibold">{t.shareLinks}</h2>
         <p className="mb-4 mt-1 text-xs text-muted">{t.linkHint}</p>
-        <CreateLinkForm
-          fundId={fund.id}
-          onCreated={handleCreated}
-          collabTaken={activeLinks.some((l) => l.role === "collaborator")}
-          viewerTaken={activeLinks.some((l) => l.role === "viewer")}
-        />
         {linksPending ? (
           <p className="py-2 text-sm text-muted">{t.loading}</p>
         ) : (
-          <ShareLinksList
-            activeLinks={activeLinks}
-            fundId={fund.id}
-            fundName={fund.name}
-            highlightId={highlightId}
-          />
+          <div className="space-y-3">
+            {(["collaborator", "viewer"] as const).map((role) => {
+              const link = activeLinks.find((l) => l.role === role);
+              return (
+                <RoleCard
+                  key={role}
+                  role={role}
+                  fundId={fund.id}
+                  fundName={fund.name}
+                  link={link}
+                  highlight={!!link && link.id === highlightId}
+                  onCreated={handleCreated}
+                />
+              );
+            })}
+          </div>
         )}
       </Card>
 

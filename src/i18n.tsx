@@ -132,9 +132,7 @@ const en = {
   membersTitle: "Members & sharing",
   share: "Share",
   shareLinks: "Share links",
-  linkHint:
-    "Anyone who opens a link joins this fund with the access you choose. Links stay active until you revoke them.",
-  linkAccessLabel: "Choose what people with this link can do",
+  linkHint: "Share a link so others can help. Each link stays active until you revoke it.",
   linkRoleCollab: "Can spend",
   linkRoleViewer: "View only",
   linkRoleCollabDesc: "They can log expenses and see the balance and all transactions.",
@@ -142,8 +140,6 @@ const en = {
   expiryDays: "Expires after (days, optional)",
   maxUses: "Max uses (optional)",
   createLink: "Create link",
-  linkExistsTag: "Already created",
-  bothLinksExist: "You've created both links. Revoke one to create a different one.",
   copy: "Copy",
   copied: "Copied!",
   copyLink: "Copy link",
@@ -160,7 +156,6 @@ const en = {
         : n === 1
           ? "1 person joined"
           : `${n} people joined`,
-  noLinks: "No links yet. Create one to invite someone.",
   members: "Members",
   removeMember: "Remove",
   confirmRemoveMember: "Remove this member? They'll lose access to this fund.",
@@ -298,9 +293,7 @@ const ar: Strings = {
   membersTitle: "الأعضاء والمشاركة",
   share: "مشاركة",
   shareLinks: "روابط المشاركة",
-  linkHint:
-    "كل من يفتح الرابط ينضم إلى هذا الرصيد بالصلاحية التي تختارها. تبقى الروابط فعّالة حتى تلغيها.",
-  linkAccessLabel: "اختر ما يمكن لحامل الرابط فعله",
+  linkHint: "شارك رابطاً ليساعدك الآخرون. يبقى كل رابط فعّالاً حتى تلغيه.",
   linkRoleCollab: "يمكنه الصرف",
   linkRoleViewer: "عرض فقط",
   linkRoleCollabDesc: "يمكنه تسجيل المصروفات والاطلاع على الرصيد وجميع الحركات.",
@@ -308,8 +301,6 @@ const ar: Strings = {
   expiryDays: "تنتهي بعد (أيام، اختياري)",
   maxUses: "أقصى عدد استخدامات (اختياري)",
   createLink: "إنشاء رابط",
-  linkExistsTag: "موجود بالفعل",
-  bothLinksExist: "لقد أنشأت كلا الرابطين. ألغِ أحدهما لإنشاء رابط مختلف.",
   copy: "نسخ",
   copied: "تم النسخ!",
   copyLink: "نسخ الرابط",
@@ -328,7 +319,6 @@ const ar: Strings = {
           : n === 2
             ? "انضم شخصان"
             : `انضم ${n} أشخاص`,
-  noLinks: "لا توجد روابط بعد. أنشئ واحداً لدعوة أحدهم.",
   members: "الأعضاء",
   removeMember: "إزالة",
   confirmRemoveMember: "إزالة هذا العضو؟ سيفقد الوصول إلى هذا الرصيد.",
