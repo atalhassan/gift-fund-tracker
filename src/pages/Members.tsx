@@ -27,6 +27,7 @@ function ShareLinkRow({ link, fundId }: { link: FundShareLink; fundId: string })
   const { t, lang } = useT();
   const revoke = useRevokeShareLink(fundId);
   const [copied, setCopied] = useState(false);
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
   const status = linkStatus(link);
   const url = `${window.location.origin}/join/${link.token}`;
 
@@ -66,9 +67,8 @@ function ShareLinkRow({ link, fundId }: { link: FundShareLink; fundId: string })
               {copied ? t.copied : t.copy}
             </button>
             <button
-              onClick={() => revoke.mutate(link.id)}
-              disabled={revoke.isPending}
-              className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-spent hover:bg-spent/10 disabled:opacity-50"
+              onClick={() => setConfirmingRevoke(true)}
+              className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-spent hover:bg-spent/10"
             >
               {t.revoke}
             </button>
@@ -81,6 +81,24 @@ function ShareLinkRow({ link, fundId }: { link: FundShareLink; fundId: string })
           )
         )}
       </div>
+      {confirmingRevoke && (
+        <div className="mt-2 flex items-center gap-2">
+          <p className="text-xs font-medium text-spent">{t.confirmRevokeLink}</p>
+          <button
+            onClick={() => revoke.mutate(link.id, { onSuccess: () => setConfirmingRevoke(false) })}
+            disabled={revoke.isPending}
+            className="shrink-0 rounded-lg bg-spent px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            {t.confirmYes}
+          </button>
+          <button
+            onClick={() => setConfirmingRevoke(false)}
+            className="shrink-0 text-xs text-muted hover:text-ink"
+          >
+            {t.cancel}
+          </button>
+        </div>
+      )}
       <p className="mt-1 text-xs text-muted">
         {link.role === "viewer" ? t.linkRoleViewer : t.linkRoleCollab}
         {` · ${t.usesLabel(link.use_count, link.max_uses)}`}
@@ -104,11 +122,13 @@ function CreateLinkForm({ fundId }: { fundId: string }) {
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="flex rounded-xl bg-paper p-1">
+      <div className="flex rounded-xl bg-paper p-1" role="tablist">
         {(["collaborator", "viewer"] as const).map((r) => (
           <button
             key={r}
             type="button"
+            role="tab"
+            aria-selected={role === r}
             onClick={() => setRole(r)}
             className={`flex-1 rounded-lg py-1.5 text-sm font-semibold transition-colors ${
               role === r ? "bg-card text-emerald shadow-sm" : "text-muted"
@@ -118,6 +138,9 @@ function CreateLinkForm({ fundId }: { fundId: string }) {
           </button>
         ))}
       </div>
+      <p className="px-1 text-xs text-muted">
+        {role === "collaborator" ? t.linkRoleCollabDesc : t.linkRoleViewerDesc}
+      </p>
       <ErrorNote>{create.error?.message}</ErrorNote>
       <Button type="submit" disabled={create.isPending} className="w-full">
         {t.createLink}
