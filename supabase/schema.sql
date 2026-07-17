@@ -1,5 +1,6 @@
--- Gift Fund Tracker — database schema
--- Run this once in the Supabase SQL Editor (Dashboard → SQL Editor → New query → paste → Run).
+-- ⚠️ LEGACY — the old single-fund app's schema, kept only as reference for the
+-- data port in supabase/migrations/20260711000000_init.sql. Do NOT run this;
+-- apply the files in supabase/migrations/ instead.
 
 -- 1. Transactions: one row per recorded expense or credit.
 --    `kind` = 'expense' subtracts from the fund; 'credit' adds to it.

@@ -5,31 +5,90 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm install        # install deps
-npm run dev        # Vite dev server (prints localhost URL)
-npm run build      # production build → dist/
-npm run preview    # serve the built dist/ locally
+npm install          # install deps
+npm run dev          # Vite dev server against .env (production Supabase project)
+npm run dev:staging  # Vite dev server against .env.staging (staging project)
+npm run build        # tsc -b && vite build — the main automated check
+npm run typecheck    # tsc -b only
 ```
 
-There is no test suite, linter, or formatter configured. `npm run build` is the only automated check.
+There is no test suite, linter, or formatter configured. `npm run build` is the
+gate for TypeScript errors. Database-level behavior is verified with
+`supabase/tests/rls_verification.sql` (self-contained, rolls back, prints `ok:`
+notices) — run it in the Supabase SQL Editor or through an MCP `execute_sql` call.
 
-Requires a `.env` (copy from `.env.example`) with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Without them `src/supabase.js` logs an error and the app renders blank.
+Requires `.env` (copy `.env.example`) with `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY`. `.env.staging` (gitignored) points `dev:staging` at the
+staging project. The Supabase MCP server in `.mcp.json` is connected to the
+**staging** project — safe for experiments; migrations must still be committed to
+`supabase/migrations/` so production gets identical SQL.
 
 ## Architecture
 
-A single-page React + Vite PWA — a personal ledger tracking spending against a fixed gift amount (default 50,000 SAR), with Supabase Postgres as the entire backend (no server code of our own).
+Multi-fund, multi-user fund tracker: owners create funds and add credit;
+collaborators join via share links and log expenses. React SPA + Supabase
+(Postgres/Auth/RLS) with no server code of our own.
 
-- **`src/App.jsx`** — the whole UI lives here. Three components: `App` (session gate), `Auth` (email/password sign-in), `Tracker` (the ledger). Styling is inline JS objects keyed off the `C` palette constant; there is no CSS framework or stylesheet. All copy is bilingual via the `STR` object (`en`/`ar`) with RTL handled by `dir` and `insetInline*`/`marginInline*` logical properties — when adding UI text, add both languages and prefer logical CSS properties.
-- **`src/supabase.js`** — the single Supabase client, imported wherever data is touched.
-- **`supabase/schema.sql`** — the source of truth for the database. Run once in the Supabase SQL Editor. Two tables: `transactions` (one row per expense) and `fund_settings` (per-user starting balance).
+### Frontend (`src/`)
+
+- **Stack**: TypeScript (strict), React Router 7, TanStack Query 5, Tailwind 4
+  (via `@tailwindcss/vite`; theme tokens in `src/index.css` — the `C` palette of
+  the old app lives there as `--color-*` variables).
+- **`main.tsx`** — providers (QueryClient → Lang → Auth → Router) and all routes.
+  Protected routes nest inside `RequireAuth` + `Shell` (header with language
+  toggle/sign-out); `/login`, `/signup`, `/join/:token` are public.
+- **`auth.tsx`** — `AuthProvider` (session state) and `useProfile`. On
+  `SIGNED_OUT` the entire query cache is cleared — never let one account's
+  cached data show under the next sign-in.
+- **`hooks/`** — all Supabase data access: `funds.ts`, `transactions.ts`
+  (infinite query + optimistic add with rollback), `sharing.ts` (members, share
+  links, `PENDING_JOIN_KEY`). Query keys always include `user?.id`.
+- **`i18n.tsx`** — every UI string exists in `en` and `ar` (typed: `ar` must
+  match `en`'s shape). RTL comes from `dir` on `<html>`; use logical CSS
+  (`ms-*`/`me-*`, `insetInline*`) so layouts mirror automatically. When adding
+  copy, always add both languages.
+- **`types.ts`** — generated from the live schema (MCP
+  `generate_typescript_types` or `supabase gen types`); regenerate after any
+  migration, keep the hand-written aliases at the bottom. Don't hand-edit the
+  generated section: supabase-js needs the `Relationships` arrays or every row
+  type silently degrades to `never`.
+
+### Database (`supabase/`)
+
+- **`migrations/`** — the source of truth, applied in filename order. The init
+  migration also contains the legacy-app data port (renames old tables to
+  `legacy_*`, rebuilds them as funds, self-verifies balances).
+  `schema.sql` is the **legacy** single-fund schema, kept only as reference for
+  the port.
+- Tables: `profiles` (mirror of `auth.users`, created by trigger), `funds`,
+  `fund_members`, `fund_share_links`, `transactions`, plus the `fund_balances`
+  view (`security_invoker`).
+- **`seed.sql`** — staging/demo data (demo-owner / demo-collab, password
+  `demo-password-123`); idempotent; never run on production.
 
 ### How data access works (important)
 
-Every table has Row-Level Security keyed on `auth.uid() = user_id`, so a logged-out or wrong-user request simply returns nothing rather than erroring. Two consequences to keep in mind when editing queries:
+RLS is the enforcement layer; UI role checks are cosmetic. Per-fund roles come
+from `fund_members` (owner also has a row, inserted by the `on_fund_created`
+trigger). Rules to preserve when editing queries:
 
-- On **insert**, `user_id` is *not* set in JS — the column defaults to `auth.uid()` in Postgres (see `transactions` insert in `Tracker`). `fund_settings` upserts *do* pass `user_id` explicitly because it's the conflict target. Follow whichever pattern the existing table uses.
-- Reads never filter by `user_id` in JS (`select("*")`); RLS scopes them. Don't add redundant `.eq("user_id", ...)` filters.
+- Reads never filter by user in JS — RLS scopes them. `.eq("fund_id", ...)` is
+  fine; redundant owner/member filters are not.
+- `funds.owner_id` and `transactions.created_by` must be set explicitly on
+  insert (policies check them against `auth.uid()`; no column defaults).
+- Collaborator memberships are created **only** by the `redeem_share_link`
+  RPC (security definer). Never insert into `fund_members` from the client.
+- An UPDATE blocked by RLS returns 0 rows, not an error — treat empty
+  `.select()` results after update as permission denials (see `useUpdateTx`).
+- `anon` has no table grants at all; every read happens signed-in.
+- New SECURITY DEFINER functions: revoke PUBLIC/anon execute (see the
+  harden_function_grants migration) or the Supabase advisor flags them.
 
-State is optimistic: the UI updates local React state immediately, then fires the Supabase call (e.g. `addTx`, `removeTx`). There is no realtime subscription — cross-device sync happens on page load/refresh, not live.
+### Verification pattern
 
-The `anon` key is public by design and ships in the browser bundle; data protection is RLS, never key secrecy. Never introduce the `service_role` key into this frontend.
+Schema changes: run the RLS test after applying. Frontend changes: drive the
+real app with Playwright against `npm run dev:staging` (demo users above) —
+launch headless Chrome with `channel: "chrome"`; PGlite (`@electric-sql/pglite`)
+emulates Supabase Postgres well for offline SQL checks (create `anon`,
+`authenticated`, `service_role` roles, `auth.users`, `auth.uid()` reading
+`request.jwt.claims`).

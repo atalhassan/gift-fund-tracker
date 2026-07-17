@@ -1,55 +1,112 @@
-# Gift Fund Tracker
+# Fund Tracker
 
-A small personal ledger for tracking spending from a fixed gift (default 50,000 SAR),
-synced across phone and laptop via Supabase Postgres. Arabic/English, install-to-home-screen.
+A bilingual (English/العربية) web app where a **fund manager** creates funds, adds
+credit, and shares individual funds with other people, who can then log expenses
+against them. Every fund shows a running balance (credits − expenses) and a full
+transaction history. Installable to the home screen as a PWA.
 
----
+Built with Vite + React (TypeScript), React Router, TanStack Query, and Tailwind CSS,
+on Supabase (Postgres + Auth + Row-Level Security). No custom server — all access
+control is enforced in the database by RLS.
 
-## What you get
+## Roles
 
-- **Cross-device sync** — same ledger on every device you sign in on.
-- **Private** — email + password auth, Row-Level Security so only you see your data.
-- **Offline-friendly install** — add to home screen and it behaves like an app.
+Roles are per fund — you can own one fund and collaborate on another.
 
----
+| Capability | Owner | Collaborator |
+|---|---|---|
+| Create / rename / delete the fund | ✅ | ❌ |
+| Add credit | ✅ | ❌ |
+| Add expenses | ✅ | ✅ |
+| Edit / delete a transaction | any in the fund | only their own |
+| View balance & history | ✅ | ✅ |
+| Share links & member management | ✅ | ❌ |
 
-## Setup (about 10 minutes)
+Collaborators join by opening a share link (`/join/<token>`); links are revocable
+and can carry an expiry date and a max-use cap.
 
-### 1. Create the database (Supabase)
+## Setup
 
-1. Sign up at supabase.com and create a new project. Pick a region close to you (Frankfurt or Bahrain are nearest to Riyadh). Save the database password somewhere safe.
-2. When the project is ready, open **SQL Editor → New query**, paste the contents of `supabase/schema.sql`, and run it. This creates the two tables and the security policies.
-3. (Optional, removes signup friction) Go to **Authentication → Sign In / Providers → Email** and turn **off** "Confirm email." With it off, creating an account signs you straight in. Leave it on if you'd rather click a confirmation link.
-4. Open **Project Settings → API** and copy two things: the **Project URL** and the **anon public** key.
+### 1. Create the Supabase project
 
-### 2. Configure and run locally
+1. Sign up at [supabase.com](https://supabase.com) and create a project (free tier
+   is fine; pick a region near you).
+2. Apply the migrations, in filename order, either way:
+   - **SQL Editor**: paste each file from `supabase/migrations/` into
+     SQL Editor → New query and run them oldest-first, or
+   - **CLI**: `supabase login`, `supabase link --project-ref <ref>`,
+     `supabase db push`.
+3. Verify the security model (recommended): paste
+   `supabase/tests/rls_verification.sql` into the SQL Editor and run it. Every
+   check prints an `ok:` notice and the script rolls itself back; it fails loudly
+   if any policy is wrong.
+4. In **Authentication → URL Configuration**, set the Site URL to your app's URL
+   (during development: `http://localhost:5173`) so confirmation and magic-link
+   emails land back on the app.
+
+> **Upgrading from the old single-fund app?** The first migration detects the
+> legacy `transactions`/`fund_settings` tables, renames them to `legacy_*`, and
+> ports every user's data into a fund named after their fund title (the starting
+> balance becomes an opening credit). It verifies the ported balances match and
+> aborts — changing nothing — on any mismatch. The `legacy_*` tables are kept;
+> drop them once you've confirmed the numbers.
+
+### 2. Run the app
 
 ```bash
 npm install
-cp .env.example .env      # then paste your URL + anon key into .env
+cp .env.example .env      # paste your Project URL + anon/publishable key
 npm run dev               # open the printed localhost URL
 ```
 
-Create your account on the sign-in screen, then record a transaction to confirm it saves. Refresh — it should still be there.
+Sign up, create a fund, record a transaction, refresh — it should persist.
 
-### 3. Deploy (Vercel example; Netlify/Cloudflare Pages work the same way)
+### 3. Demo data (optional)
 
-1. Push this folder to a GitHub repo.
-2. On vercel.com → **Add New → Project → import the repo**. Vite is auto-detected (build `npm run build`, output `dist`).
-3. Before deploying, add two **Environment Variables**:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-4. Deploy. You get a public URL like `your-app.vercel.app`.
-5. Back in Supabase → **Authentication → URL Configuration**, add that URL to the allowed redirect/site URLs.
+Run `supabase/seed.sql` in the SQL Editor (**not on production**) to get two
+confirmed users sharing one fund with a few transactions:
 
-### 4. Install on your phone
+- `demo-owner@example.com` / `demo-password-123` (owner)
+- `demo-collab@example.com` / `demo-password-123` (collaborator)
 
-Open the deployed URL on your phone → browser menu → **Add to Home Screen**. Sign in once; the session persists, so it opens straight to your ledger after that.
+The script is idempotent — re-running it does nothing.
 
----
+### 4. Staging environment (optional)
 
-## Notes
+Keep a second Supabase project for testing and point the app at it with a
+separate env file:
 
-- The `anon` key is meant to be public — it ships in the browser bundle. Your data is protected by Row-Level Security, not by hiding the key. **Never** expose the `service_role` key.
-- To change the starting amount, tap the pencil next to "of 50,000" in the app.
-- Everything is one Supabase project on the free tier, which is comfortably enough for personal use.
+```bash
+cp .env.staging.example .env.staging   # staging project URL + key
+npm run dev:staging                    # same app, staging database
+```
+
+### 5. Deploy
+
+Any static host works (Vercel / Netlify / Cloudflare Pages):
+
+1. Import the repo; Vite is auto-detected (`npm run build`, output `dist/`).
+2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as environment variables.
+3. Since this is an SPA with client-side routing, make sure unknown paths
+   rewrite to `/index.html` (Vercel and Netlify do this automatically for Vite;
+   on Cloudflare Pages add a `_redirects` file with `/* /index.html 200`).
+4. Add the deployed URL in Supabase **Authentication → URL Configuration**.
+
+## Commands
+
+```bash
+npm run dev          # dev server against .env
+npm run dev:staging  # dev server against .env.staging
+npm run build        # typecheck (tsc -b) + production build
+npm run typecheck    # typecheck only
+npm run preview      # serve the built dist/ locally
+```
+
+## Security notes
+
+- The `anon`/publishable key ships in the browser bundle by design; every table
+  is protected by Row-Level Security keyed on fund membership. **Never** put the
+  `service_role` key in frontend code.
+- Share-link tokens are 24 random bytes generated in Postgres and are only
+  readable by the fund owner; redemption goes through a `security definer` RPC
+  (`redeem_share_link`) — the sole path that creates collaborator memberships.
