@@ -344,7 +344,8 @@ const LangContext = createContext<LangState>({ lang: "en", t: en, toggle: () => 
 function initialLang(): Lang {
   const saved = localStorage.getItem("lang");
   if (saved === "en" || saved === "ar") return saved;
-  return navigator.language?.startsWith("ar") ? "ar" : "en";
+  // Arabic is the default for anyone who hasn't chosen otherwise.
+  return "ar";
 }
 
 export function LangProvider({ children }: { children: ReactNode }) {
