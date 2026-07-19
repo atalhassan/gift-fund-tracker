@@ -5,10 +5,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./index.css";
 import { LangProvider } from "./i18n";
 import { AuthProvider } from "./auth";
-import { RequireAuth, RequirePhone } from "./components/RequireAuth";
+import { RequireAuth, RequireName, RequirePhone } from "./components/RequireAuth";
 import { Shell } from "./components/Shell";
 import Login from "./pages/Login";
 import SetupPhone from "./pages/SetupPhone";
+import SetupName from "./pages/SetupName";
 import Dashboard from "./pages/Dashboard";
 import NewFund from "./pages/NewFund";
 import FundDetail from "./pages/FundDetail";
@@ -41,10 +42,15 @@ createRoot(document.getElementById("root")!).render(
                 {/* Reachable while signed in but before a phone is verified —
                     must sit outside RequirePhone or the gate would loop. */}
                 <Route path="/setup-phone" element={<SetupPhone />} />
+                {/* Same reasoning: outside RequireName, or a nameless account
+                    could never reach the page that sets its name. */}
+                <Route path="/setup-name" element={<SetupName />} />
                 <Route
                   element={
                     <RequirePhone>
-                      <Shell />
+                      <RequireName>
+                        <Shell />
+                      </RequireName>
                     </RequirePhone>
                   }
                 >

@@ -64,6 +64,13 @@ const en = {
   setupPhoneTitle: "Add your phone number",
   setupPhoneSubtitle: "We're switching to phone sign-in. Verify your number to keep access to your account.",
 
+  // mandatory name gate (new phone accounts, right after verifying the code)
+  setupNameTitle: "What's your name?",
+  setupNameSubtitle: "So others sharing a fund with you know who's who.",
+  nameLabel: "Name",
+  namePlaceholder: "Your name",
+  continueLabel: "Continue",
+
   // dashboard
   yourFunds: "Your funds",
   sharedFunds: "Shared with you",
@@ -221,6 +228,12 @@ const ar: Strings = {
 
   setupPhoneTitle: "أضف رقم جوالك",
   setupPhoneSubtitle: "ننتقل إلى تسجيل الدخول بالجوال. وثّق رقمك للحفاظ على الوصول إلى حسابك.",
+
+  setupNameTitle: "ما اسمك؟",
+  setupNameSubtitle: "ليعرف من يشاركونك الرصيد من أنت.",
+  nameLabel: "الاسم",
+  namePlaceholder: "اسمك",
+  continueLabel: "متابعة",
 
   yourFunds: "أرصدتك",
   sharedFunds: "مشتركة معك",
