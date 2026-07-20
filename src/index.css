@@ -2,15 +2,15 @@
 
 /* The warm ledger-book palette carried over from the original app: green ink
    for what remains, clay for what's gone, a gold thread for the origin of the
-   money. Dimmed well off paper-white — no surface is pure #fff any more, and
-   the surfaces are soft gradients rather than flat fills. */
+   money. Dimmed off paper-white — no surface is pure #fff any more, and the
+   surfaces are soft gradients rather than flat fills. */
 @theme {
-  --color-paper: #c6bfae;
-  --color-card: #d7d0bf;
+  --color-paper: #e0dacb;
+  --color-card: #ece7da;
   --color-ink: #1f2a24;
-  /* The inks are pulled a shade darker than the original brand values: the
-     surfaces below them dropped ~20%, and dark-on-dim loses contrast, so
-     emerald/gold/clay would fall under 4.5:1 as small text if left alone. */
+  /* The inks are pulled a shade darker than the original brand values. They
+     were darkened back when the surfaces were dimmer; the surfaces have since
+     been lifted, so this now just buys extra headroom over 4.5:1. */
   --color-emerald: #0a5a3e;
   --color-emerald-lit: #16a06f;
   --color-emerald-soft: #d3e4da;
@@ -18,7 +18,7 @@
   --color-muted: #45504b;
   --color-spent: #8b3826;
   --color-spent-lit: #c8593d;
-  --color-line: #b0a68f;
+  --color-line: #c4bba4;
 
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
@@ -27,8 +27,8 @@
 /* Surface gradients. Deliberately outside @theme: these are background-images,
    not colors, so they stay plain vars rather than generating a bg-* palette. */
 :root {
-  --grad-page: linear-gradient(170deg, #cfc8b7 0%, #c6bfae 45%, #bdb5a1 100%);
-  --grad-card: linear-gradient(160deg, #dcd6c7 0%, #d2cbb9 100%);
+  --grad-page: linear-gradient(170deg, #e9e3d5 0%, #e0dacb 45%, #d6cfbd 100%);
+  --grad-card: linear-gradient(160deg, #f1ede2 0%, #e7e1d3 100%);
   --grad-emerald: linear-gradient(180deg, var(--color-emerald-lit) 0%, var(--color-emerald) 100%);
   --grad-spent: linear-gradient(180deg, var(--color-spent-lit) 0%, var(--color-spent) 100%);
 }
